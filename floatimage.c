@@ -86,14 +86,44 @@ image FloatimageRead(char *fn)
 	return I;
 }
 
+image NormalizeImageRange(image I, double min, double max)
+{
+	double dmin, dmax, f, c;
+	image R;
+	int i;
+	dmin=dmax=I.I[0];
+	for (i=1;i<I.N*I.M;i++)
+	{
+		if (I.I[i]<dmin)
+			dmin=I.I[i];
+		if (I.I[i]>dmax)
+			dmax=I.I[i];
+	}
+	if (fabs(dmax-dmin)/fabs(dmin+dmax)<1e-10)
+	{
+		fprintf(stderr, "Error: cannot normalize float image %e %e\n", dmin, dmax);
+		exit(1);
+	}
+	f=(max-min)/(dmax-dmin);
+	c=min-f*dmin;
+	R.I=malloc(I.N*I.M*sizeof(double));
+	R.N=I.N;
+	R.M=I.M;
+	for (i=0;i<I.N*I.M;i++)
+		R.I[i]=f*I.I[i]+c;
+	printf("scale: %e\t shift(0 @): %e)\n", f, c);
+	return R;
+}
 
-void FloatimageWrite(char *fn, image I)
+void FloatimageWrite(char *fn, image I, int norm, double min, double max)
 {
 	
 	MagickWand *wand = NULL;
 	PixelWand *p_wand = NULL;
 	MagickBooleanType status;
 	double *data;
+	image *P;
+	image N;
 	
 	// init lib
 	MagickWandGenesis();
@@ -107,8 +137,16 @@ void FloatimageWrite(char *fn, image I)
 	if (status == MagickFalse)
 		ThrowWandException(wand);
 	
+	if (norm)
+	{
+		N=NormalizeImageRange(I,min,max);
+		P=&N;
+	}
+	else
+		P=&I;
+	
 	// import the data
-    data=TransposeImageData(I);
+    data=TransposeImageData(*P);
 	status=MagickImportImagePixels(wand,0,0,I.M,I.N,"I",DoublePixel,data);
 	
 	if (status == MagickFalse)
@@ -126,9 +164,60 @@ void FloatimageWrite(char *fn, image I)
 		wand = DestroyMagickWand(wand);
 	
     free(data);
+	if (norm)
+		FreeImage(&N);
 	MagickWandTerminus();
 }
 
+void FloatimageDisplay(image I, int norm, double min, double max)
+{
+	
+	MagickWand *wand = NULL;
+	PixelWand *p_wand = NULL;
+	MagickBooleanType status;
+	double *data;
+	image *P;
+	image N;
+	
+	// init lib
+	MagickWandGenesis();
+	wand=NewMagickWand();
+	
+	// init the new image
+	p_wand = NewPixelWand();
+	PixelSetColor(p_wand,"white");
+	status=MagickNewImage(wand,I.M,I.N,  p_wand);
+	
+	if (status == MagickFalse)
+		ThrowWandException(wand);
+	
+	if (norm)
+	{
+		N=NormalizeImageRange(I,min,max);
+		P=&N;
+	}
+	else
+		P=&I;
+	
+	// import the data
+    data=TransposeImageData(*P);
+	status=MagickImportImagePixels(wand,0,0,I.M,I.N,"I",DoublePixel,data);
+	
+	if (status == MagickFalse)
+		ThrowWandException(wand);
+		
+	// display the image
+	MagickDisplayImage(wand, ":0");
+		
+	// wrap it up
+	if(wand)
+		wand = DestroyMagickWand(wand);
+	
+    free(data);
+	if (norm)
+		FreeImage(&N);
+	MagickWandTerminus();
+}
 void PlotImage(image I)
 {
 	int i,j;
@@ -173,26 +262,6 @@ void Vj2EL(image I, double T)
 		I.I[i]=exp(I.I[i]/(_kb*T));		
 }
 
-void NormalizeImageRange(image I, double min, double max)
-{
-	double dmin, dmax, f, c;
-	int i;
-	dmin=dmax=I.I[0];
-	for (i=1;i<I.N*I.M;i++)
-	{
-		if (I.I[i]<dmin)
-			dmin=I.I[i];
-		if (I.I[i]>dmax)
-			dmax=I.I[i];
-	}
-	if ((dmax-dmin)/(dmin+dmax)<1e-10)
-		return;
-	f=(max-min)/(dmax-dmin);
-	c=min-f*dmin;
-	for (i=0;i<I.N*I.M;i++)
-		I.I[i]=f*I.I[i]+c;
-	printf("scale: %e\t shift(0 @): %e)\n", f, c);
-}
 
 /*
 int main(int argc, char **argv)

@@ -18,8 +18,9 @@ int main(int argc, char **argv)
 	
 	EL2Vj(Iin, 300); // convert to junction voltages	
 	Iout=PolynomalFilter(Iin, N, m, m_nabla, 'n');
-	NormalizeImageRange(Iout, 0, 1);
-	FloatimageWrite(argv[2], Iout);
+	FloatimageDisplay(Iin, 1,0,1);
+	FloatimageDisplay(Iout, 1,0,1);
+	FloatimageWrite(argv[2], Iout, 1,0,1);
 	FreeImage(&Iin);
 	FreeImage(&Iout);
 	return 0;
