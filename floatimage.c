@@ -20,13 +20,16 @@ double * TransposeImageData(image I)
 	return AA;
 }
 
-void TransposeFloatImage(image I)
+void TransposeFloatImage(image *I)
 {
 	double *AA;
-	int i;
-	AA=TransposeImageData(I);
-	for (i=0;i<I.N*I.M;i++)
-		I.I[i]=AA[i];
+	int i, D;
+	AA=TransposeImageData(*I);
+	for (i=0;i<I->N*I->M;i++)
+		I->I[i]=AA[i];
+	D=I->M;
+	I->M=I->N;
+	I->N=D;
 	free(AA);
 }
 
@@ -66,17 +69,25 @@ image FloatimageRead(char *fn)
 	status=MagickReadImage(wand,fn);
 	if (status == MagickFalse)
 		ThrowWandException(wand);
-    
+		
+	status=MagickTransformImageColorspace(wand, GRAYColorspace);
+	if (status == MagickFalse)
+		ThrowWandException(wand);
+	
+	
     // get the size and allocate the image
 	width = MagickGetImageWidth(wand);
     height = MagickGetImageHeight(wand);
-    I.M=(int)width;
-    I.N=(int)height;
+    fprintf(stderr, "image size %lux%lu\n", width, height);
+    I.N=(int)width; // this is the wrong way round as I have row major ordering and imagemagick column major
+    I.M=(int)height;
     I.I=malloc(I.N*I.M*sizeof(double));
 
     // extract the data
-    MagickExportImagePixels(wand, 0, 0, width, height, "I", DoublePixel, I.I);
-    TransposeFloatImage(I);
+    MagickExportImagePixels(wand, 0, 0, I.N, I.M, "I", DoublePixel, I.I);
+    
+    TransposeFloatImage(&I);
+    
     
     // wrap it up
 	if(wand)
@@ -218,7 +229,7 @@ void FloatimageDisplay(image I, int norm, double min, double max)
 		FreeImage(&N);
 	MagickWandTerminus();
 }
-void PlotImage(image I)
+void Floatimage2stdout(image I)
 {
 	int i,j;
 	for (i=0;i<I.N;i++)
@@ -262,6 +273,18 @@ void Vj2EL(image I, double T)
 		I.I[i]=exp(I.I[i]/(_kb*T));		
 }
 
+image TestImage(int N, int M, double p)
+{
+	int i, j;
+	image R;
+	R.N=N;
+	R.M=M;
+	R.I=malloc(N*M*sizeof(double));	
+	for (i=0;i<N;i++)
+		for (j=0;j<M;j++)
+			R.I[INDEX(i,j,N)]=pow((double)(i-N/2),p)+pow((double)(j-M/2),p);
+	return R;	
+} 
 
 /*
 int main(int argc, char **argv)
