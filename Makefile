@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Ofast `MagickWand-config --cflags`
+CFLAGS = -Wall -pedantic -Og -g `MagickWand-config --cflags`
 LFLAGS =  -lm -ltiff -flto -llapack -lopenblas -lfftw3 `MagickWand-config --ldflags --libs`
 CC = gcc
 SRC=floatimage.c filter.c main.c

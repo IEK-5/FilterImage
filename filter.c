@@ -332,7 +332,7 @@ void FreeFilterSet(filterset *F)
 }
 
 
-image ApplyFilter(image I, filterset F)
+image ApplyFilter(image I, int ny, int nx, filterset F)
 /* apply a filter set */
 {
 	int i, j, k,l;
@@ -346,28 +346,30 @@ image ApplyFilter(image I, filterset F)
 			double s=0;
 			filter f;
 			int ii=0, jj=0;
+			/* OK this part is a bit of a disaster
+			 * We need to select the right filter such that we do not get out of the image bounds
+			 */
+			if (i-F.nn*ny<0)
+				ii=i-F.nn*ny-i%ny;
+			if (i+F.ns*ny-I.N+1>0)
+				ii=i+F.ns*ny-I.N+1+((I.N-1-i)%ny);
+				
+			if (j-F.nw*nx<0)
+				jj=j-F.nw*nx-(j%nx);
+			if (j+F.ne*nx-I.M+1>0)
+				jj=j+F.ne*nx-I.M+1+((I.M-1-j)%nx);
+				
+			f=F.set[(F.nn+ii/ny)*(F.nw+F.ne+1)+(F.nw+jj/nx)];
 			
-			if (i-F.nn<0)
-				ii=i-F.nn;
-			if (i+F.ns-I.N+1>0)
-				ii=i+F.ns-I.N+1;
-				
-			if (j-F.nw<0)
-				jj=j-F.nw;
-			if (j+F.ne-I.M+1>0)
-				jj=j+F.ne-I.M+1;
-				
-			f=F.set[(F.nn+ii)*(F.nw+F.ne+1)+(F.nw+jj)];
-				
 			for (k=-f.nn;k<=f.ns;k++)
 				for (l=-f.nw;l<=f.ne;l++)
-					s+=f.F[INDEX(k+f.nn,l+f.nw,f.nn+f.ns+1)]*I.I[INDEX(i+k,j+l,I.N)];
+					s+=f.F[INDEX(k+f.nn,l+f.nw,f.nn+f.ns+1)]*I.I[INDEX(i+k*ny,j+l*nx,I.N)];
 			R.I[INDEX(i,j,I.N)]=s;
 		}
 	return R;
 }
 
-image PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d)
+image PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d)
 /* the basic interface:
  * input:
  * I: 		image in column major format 
@@ -381,12 +383,12 @@ image PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d)
 	filterset F;
 	image R;
 	F=DerivOperatorSet2D(nsurr, nsurr, nsurr, nsurr, deriv_m, m, d);
-	R=ApplyFilter(I, F);
+	R=ApplyFilter(I, step, step, F);
 	FreeFilterSet(&F);
 	return R;
 }
 
-image FFT_ApplyFilter(image I, filter F)
+image FFT_ApplyFilter(image I, int nx, int ny, filter F)
 {
     fftw_complex *FI=NULL, *FP=NULL, *P;
 	fftw_plan plan_inverse;
@@ -397,8 +399,8 @@ image FFT_ApplyFilter(image I, filter F)
 	int i, j, ii,jj, ww;
 	// create a filter image
 	PSF=calloc(I.N*I.M, sizeof(double));
-	for(i=-F.nn;i<=F.ns;i++)
-		for (j=-F.nw;j<=F.ne;j++)
+	for(i=-F.nn*ny;i<=F.ns*nx;i+=ny)
+		for (j=-F.nw*nx;j<=F.ne*nx;j+=nx)
 		{
 			ii=i;
 			jj=j;
@@ -406,7 +408,7 @@ image FFT_ApplyFilter(image I, filter F)
 				ii+=I.N;
 			if (j<0)
 				jj+=I.M;			
-			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i, F.nw+j,F.nn+F.ns+1)];
+			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i/ny, F.nw+j/nx,F.nn+F.ns+1)];
 		}
 	//PrintMat(PSF, I.N, I.M);
 	//PrintMat(F.F, F.nn*F.ns+1, F.nw*F.ne+1);
@@ -448,7 +450,7 @@ image FFT_ApplyFilter(image I, filter F)
     return R;
 }
 
-image FFT_PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d)
+image FFT_PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d)
 /* same as above only now using an fft. 
  * downside: edge effects as the FFT treats the image as periodic
  * upside: This routine's computation time is independant on the filter size and thus this routine is faster for larger filters
@@ -458,145 +460,8 @@ image FFT_PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d)
     image R;
 	filter F;
 	F=PartDeriv2D(nsurr, nsurr, nsurr, nsurr, deriv_m, m, d);
-	R=FFT_ApplyFilter(I, F);
+	R=FFT_ApplyFilter(I, step, step, F);
 	FreeFilter(&F);
     return R;
 }
 
-
-image PolynomalExtremaLocator_m(image I, int nsurr, double r, char method)
-/* the basic interface:
- * input:
- * I: 		image in row major format 
- * N,M: 	size of the image
- * nsurr:	number of elements to use in north, south, west, and east direction
- * Using a local quadratic fit to find local extrema
- */
-{	
-	image Idx, Idy, Idx2, Idy2;
-	image R;
-	int i;
-	
-	// compute derivatives
-	if (method=='f')
-	{
-		filter Fdx, Fdy, Fdx2, Fdy2;
-		Fdx=PartDeriv2D(nsurr, nsurr, nsurr, nsurr, 1, 2, 'x');
-		Fdy=PartDeriv2D(nsurr, nsurr, nsurr, nsurr, 1, 2, 'y');
-		Fdx2=PartDeriv2D(nsurr, nsurr, nsurr, nsurr, 2, 2, 'x');
-		Fdy2=PartDeriv2D(nsurr, nsurr, nsurr, nsurr, 2, 2, 'y');
-		// use FFT
-		Idx=FFT_ApplyFilter(I, Fdx);
-		Idy=FFT_ApplyFilter(I, Fdy);
-		Idx2=FFT_ApplyFilter(I, Fdx2);
-		Idy2=FFT_ApplyFilter(I, Fdy2);
-		//cleanup
-		FreeFilter(&Fdx);
-		FreeFilter(&Fdy);
-		FreeFilter(&Fdx2);
-		FreeFilter(&Fdy2);
-	}
-	else
-	{	
-		filterset Fdx, Fdy, Fdx2, Fdy2;
-		// create filters
-		Fdx=DerivOperatorSet2D(nsurr, nsurr, nsurr, nsurr, 1, 2, 'x');
-		Fdy=DerivOperatorSet2D(nsurr, nsurr, nsurr, nsurr, 1, 2, 'y');
-		Fdx2=DerivOperatorSet2D(nsurr, nsurr, nsurr, nsurr, 2, 2, 'x');
-		Fdy2=DerivOperatorSet2D(nsurr, nsurr, nsurr, nsurr, 2, 2, 'y');
-		// plain method
-		Idx=ApplyFilter(I, Fdx);
-		Idy=ApplyFilter(I, Fdy);
-		Idx2=ApplyFilter(I, Fdx2);
-		Idy2=ApplyFilter(I, Fdy2);
-		//cleanup
-		FreeFilterSet(&Fdx);
-		FreeFilterSet(&Fdy);
-		FreeFilterSet(&Fdx2);
-		FreeFilterSet(&Fdy2);
-	}
-	
-	// limit range of r to a reasonable range
-	if (fabs(r)>(double)nsurr)
-		r=(double)nsurr;	
-	r=r*r;
-	if(r<1)
-		r=1;
-	
-	R.N=I.N;
-	R.M=I.M;
-	R.I=calloc(R.N*R.M, sizeof(double));
-	
-	
-	for (i=0;i<I.M*I.N;i++)
-	{
-		double mx, my;
-		mx=Idx.I[i]/Idx2.I[i]; // x pos of min/max of this polynomal
-		my=Idy.I[i]/Idy2.I[i]; // y pos of min/max of this polynomal
-		if (mx*mx+my*my<r) // maximum is less than r pixels away
-		{
-			// this is a local minimum or maximum
-			// Nabla^2 is a measure for the depth (or height) of the local extrema 
-			// we take the minimal value
-			R.I[i]+=Idy2.I[i]+Idx2.I[i];
-			/*
-			if (Idx2.I[i]>Idy2.I[i])
-				R.I[i]+=Idy2.I[i];
-			else
-				R.I[i]+=Idx2.I[i];*/
-		}
-	}
-	
-	FreeImage(&Idx);
-	FreeImage(&Idy);
-	FreeImage(&Idx2);
-	FreeImage(&Idy2);
-	return R;
-}
-image PolynomalExtremaLocator(image I, int nsurr, double r)
-{
-	return PolynomalExtremaLocator_m(I, nsurr, r, 'n');
-}
-
-image FFT_PolynomalExtremaLocator(image I, int nsurr, double r)
-{
-	return PolynomalExtremaLocator_m(I, nsurr, r, 'f');
-}
-/*
-double *Field(int N, int M, double p)
-{
-	int i, j;
-	double *R, f;
-	R=malloc(N*M*sizeof(double));
-	f=1.0;
-	
-	for (i=0;i<N;i++)
-		for (j=0;j<M;j++)
-			R[INDEX(i,j,N)]=(pow((double)(i-N/2),p)+pow((double)(j-M/2),p))/f;
-	return R;	
-} 
-
-
-
-#define nn 10
-#define PP 1
-#define O 3
-#define N 2000
-#define M 4000
-//#define NOFFT
-int main()
-{
-	double *F, *FF;
-	F=Field(N, M, PP);
-#ifdef NOFFT
-	FF=PolynomalFilter(F, N, M, nn, O, PP, 'n');
-	//PrintMat(FF, N, M);
-#else
-	FF=FFT_PolynomalFilter(F, N, M, nn, O, PP, 'n');
-	//PrintMat(FF, N, M);
-#endif
-	free(FF);
-	free(F);
-	exit(0);
-}
-*/

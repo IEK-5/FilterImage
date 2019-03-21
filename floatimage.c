@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <ImageMagick-6/wand/MagickWand.h>
+#include <wand/MagickWand.h>
 #include "floatimage.h"
 
 double * TransposeImageData(image I)
@@ -260,7 +260,7 @@ void EL2Vj(image I, double T)
 {
 	int i;
 	for (i=0;i<I.N*I.M;i++)
-		I.I[i]=_kb*T*log(I.I[i]);		
+		I.I[i]=_kb*T*log(I.I[i]);
 }
 void Vj2EL(image I, double T)
 {

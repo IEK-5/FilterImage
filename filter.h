@@ -20,14 +20,12 @@ void FreeFilterSet(filterset *F);
 
 
 // filtering images
-image ApplyFilter(image I, filterset F);
-image PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d);
-image PolynomalExtremaLocator(image I, int nsurr, double r);
+image ApplyFilter(image I, int ny, int nx,  filterset F);
+image PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d);
 
 
 // fft based filters, faster for large filters but with edge effects
-image FFT_ApplyFilter(image I, filter F);
-image FFT_PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d);
-image FFT_PolynomalExtremaLocator(image I, int nsurr, double r);
+image FFT_ApplyFilter(image I, int ny, int nx,  filter F);
+image FFT_PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d);
 
 

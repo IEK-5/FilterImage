@@ -7,7 +7,7 @@
 #include "floatimage.h"
 #include "filter.h"
 
-typedef enum {DX, DY, NABLA, PEAK} filter_type;
+typedef enum {DX, DY, NABLA} filter_type;
 
 void Help(struct option OPTS[], char *desc[])
 {
@@ -34,9 +34,9 @@ int main(int argc, char **argv)
 {
 	image Iin, Iout;
 	char *fin=NULL, *fout=NULL, *ftxt=NULL;
-	int N=3, m=3; 
+	int N=3, m=3, step=1; 
 	filter_type T=NABLA;
-	int deriv_order=0, ItoV=0, FFT=0, p=1, c;
+	int deriv_order=0, ItoV=0, FFT=0, c;
 	double Temp; 
 	char d='n';
 	
@@ -51,11 +51,11 @@ int main(int argc, char **argv)
 			{"txt-out",     required_argument, 0, 't'},
 			{"I2V",         required_argument, 0, 'V'},
 			{"N-filter",    required_argument, 0, 'N'},
+			{"step",        required_argument, 0, 's'},
 			{"filter-order",required_argument, 0, 'm'},
 			{"dx",          required_argument, 0, 'x'},
 			{"dy",          required_argument, 0, 'y'},
 			{"nabla",       required_argument, 0, 'n'},
-			{"peak",        required_argument, 0, 'p'},
 			{"fft",               no_argument, 0, 'f'},
 			{"help",              no_argument, 0, 'h'},
 			{0, 0, 0, 0}
@@ -70,14 +70,13 @@ int main(int argc, char **argv)
 			"\tcreate derivative to x (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
 			"\tcreate derivative to y (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
 			"\tnabla operator (dx+dy) (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
-			"\tpeak detector (arg=integer>0 peak size)\n\t\t\tExperimental and not very effective so far\n\t\t\tUse a laplcian filter instead (-n 2)",
 			"\tuse the Fast Fourier Transform, makes computation\n\t\t\ttime independent of filter size but may lead to\n\t\t\tedge effects at the borders of the image",
 			"\tshow this help message and exit",
 			NULL};
 			
 		/* getopt_long stores the option index here. */
 		int option_index = 0;
-		c = getopt_long (argc, argv, "i:o:V:N:m:x:y:n:p:ft:h",long_options, &option_index);
+		c = getopt_long (argc, argv, "i:o:V:N:m:x:y:n:s:ft:h",long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -131,6 +130,14 @@ int main(int argc, char **argv)
 				}
 				N=atoi(optarg);
 				break;
+			case 's':
+				if (!optarg)
+				{
+					fprintf(stderr, "Error: --L_filter requires a length specification for the filter\n");
+					return 1;	
+				}
+				step=atoi(optarg);
+				break;
 			case 'm':
 				if (!optarg)
 				{
@@ -169,15 +176,6 @@ int main(int argc, char **argv)
 				deriv_order=atoi(optarg);
 				d='n';
 				break;
-			case 'p':
-				if (!optarg)
-				{
-					fprintf(stderr, "Error: --Ident requires an epsilon specification for the filter (default 1e-12)\n");
-					return 1;	
-				}
-				T=PEAK;
-				p=atoi(optarg);
-				break;
 			case 'f':
 				FFT=1;
 				break;
@@ -213,15 +211,9 @@ int main(int argc, char **argv)
 		case DY:
 		case NABLA:
 			if (FFT)
-				Iout=FFT_PolynomalFilter(Iin, N, m, deriv_order, d); // apply the filter
+				Iout=FFT_PolynomalFilter(Iin, N, step, m, deriv_order, d); // apply the filter
 			else
-				Iout=FFT_PolynomalFilter(Iin, N, m, deriv_order, d); // apply the filter
-			break;
-		case PEAK:
-			if (FFT)
-				Iout=FFT_PolynomalExtremaLocator(Iin, N, p);
-			else
-				Iout=PolynomalExtremaLocator(Iin, N, p);
+				Iout=PolynomalFilter(Iin, N, step, m, deriv_order, d); // apply the filter
 			break;
 		default:
 			fprintf(stderr, "Error: check status of nuclear power planst in the vicinity cause this error cannot happen\n");
@@ -235,7 +227,7 @@ int main(int argc, char **argv)
 	
 	if (ftxt)
 	{
-		if (strncmp(fin, "-", 15)==0)
+		if (strncmp(fin, "-", 2)==0)
 			Floatimage2stdout(Iout);
 		else
 			FloatimageTXTWrite(ftxt, Iout);
