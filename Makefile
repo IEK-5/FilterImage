@@ -1,5 +1,5 @@
-CFLAGS = -Wall -pedantic -Og -g `MagickWand-config --cflags`
-LFLAGS =  -lm -ltiff -flto -llapack -lopenblas -lfftw3 `MagickWand-config --ldflags --libs`
+CFLAGS = -Wall -pedantic -Ofast -flto `MagickWand-config --cflags`
+LFLAGS =  -lm -flto -llapack -lopenblas -lfftw3 `MagickWand-config --ldflags --libs`
 CC = gcc
 SRC=floatimage.c filter.c main.c
 OBJ=floatimage.o filter.o main.o
