@@ -4,10 +4,6 @@
 #include <ImageMagick-6/wand/MagickWand.h>
 #include "floatimage.h"
 
-#define INDEX(R,C,N)  ((C)*(N)+(R))
-#define ROW(I,N)  ((I)%(N))
-#define COL(J,N)  ((J)/(N))
-
 double * TransposeImageData(image I)
 {
 	double *AA;

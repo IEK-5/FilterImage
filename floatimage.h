@@ -1,7 +1,11 @@
 typedef struct image {
-	double *I;
+	double *I; // images must in column major format
 	int N, M;
 } image;
+
+#define INDEX(R,C,N)  ((C)*(N)+(R)) // column major format
+#define ROW(I,N)  ((I)%(N))
+#define COL(J,N)  ((J)/(N))
 
 image FloatimageRead(char *fn);
 void FloatimageWrite(char *fn, image I, int norm, double min, double max);

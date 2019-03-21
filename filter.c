@@ -9,10 +9,6 @@ void dgetrf_(int* M, int *N, double* A, int* lda, int* IPIV, int* INFO);
 void dgetri_(int* N, double* A, int* lda, int* IPIV, double* WORK, int* lwork, int* INFO);
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA, double *B, int *LDB, double *BETA, double *C,int *LDC); 
 
-#define INDEX(R,C,N)  ((C)*(N)+(R))
-#define ROW(I,N)  ((I)%(N))
-#define COL(J,N)  ((J)/(N))
-
 void Transpose(double *A, int N, int M)
 {
 	double *AA;
@@ -178,7 +174,7 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, char d)
  * deriv_m: Order of the differentaitor operator (may also be 0, which results in smoothing)
  * m: order of the polynomal
  * d: direction, can be 'x' (partial derivative to x), 'y' (partial derivative to y), 'n' (nabla operator, sum of partial derivatives to x and y)
- * returns the filter coefficients in row major format (vector of size (nn+ns*1)*(nw+ne*1))
+ * returns the filter coefficients in column major format (vector of size (nn+ns*1)*(nw+ne*1))
  */
 {
 	
@@ -374,7 +370,7 @@ image ApplyFilter(image I, filterset F)
 image PolynomalFilter(image I, int nsurr, int m, int deriv_m, char d)
 /* the basic interface:
  * input:
- * I: 		image in row major format 
+ * I: 		image in column major format 
  * N,M: 	size of the image
  * nsurr:	number of elements to use in north, south, west, and east direction
  * deriv_m:	which derivative to compute

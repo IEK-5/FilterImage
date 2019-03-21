@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 			"\tcreate derivative to x (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
 			"\tcreate derivative to y (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
 			"\tnabla operator (dx+dy) (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
-			"\tpeak detector (arg=integer>0 peak size)",
+			"\tpeak detector (arg=integer>0 peak size)\n\t\t\tExperimental and not very effective so far\n\t\t\tUse a laplcian filter instead (-n 2)",
 			"\tuse the Fast Fourier Transform, makes computation\n\t\t\ttime independent of filter size but may lead to\n\t\t\tedge effects at the borders of the image",
 			"\tshow this help message and exit",
 			NULL};
