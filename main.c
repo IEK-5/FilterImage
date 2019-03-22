@@ -60,6 +60,7 @@ int main(int argc, char **argv)
 			{"nabla",             no_argument, 0, 'n'},
 			{"fft",               no_argument, 0, 'f'},
 			{"plain",             no_argument, 0, 'p'},
+			{"hybrid",            no_argument, 0, 'H'},
 			{"help",              no_argument, 0, 'h'},
 			{0, 0, 0, 0}
 		};
@@ -78,12 +79,14 @@ int main(int argc, char **argv)
 			"\tcontribution in y direction (arg=float)",
 			"\tnabla operator (dx+dy)",
 			"\tuse the Fast Fourier Transform, makes computation\n\t\t\ttime independent of filter size but may lead to\n\t\t\tedge effects at the borders of the image",
+			"\tuse a plain (slow) convolution method",
+			"\tuse a hybrid convolution method (FFT for the bulk\n\t\t\tand plain for the edges",
 			"\tshow this help message and exit",
 			NULL};
 			
 		/* getopt_long stores the option index here. */
 		int option_index = 0;
-		c = getopt_long (argc, argv, "i:o:V:N:R:m:M:x:y:ns:r:fpt:h",long_options, &option_index);
+		c = getopt_long (argc, argv, "i:o:V:N:R:m:M:x:y:ns:r:fpHh",long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -230,6 +233,9 @@ int main(int argc, char **argv)
 				break;
 			case 'p':
 				FFT=0;
+				break;
+			case 'H':
+				FFT=1;
 				break;
 			case '?':
 				/* getopt_long already printed an error message. */
