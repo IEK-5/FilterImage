@@ -265,13 +265,13 @@ int main(int argc, char **argv)
 		
 	switch(FFT)
 	{
-		case 0:
+		case 0: // plain method
 			Iout=PL_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
 			break;
-		case 1:
+		case 1: // hybrid method
 			Iout=PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
 			break;
-		case 2:
+		case 2: //FFT method
 			Iout=FFT_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
 			break;
 		default:
