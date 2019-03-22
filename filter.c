@@ -165,7 +165,7 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 }
 
 
-filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, char d)
+filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy)
 /* 
  * nn: number values to the north
  * ns: number values to the south
@@ -198,55 +198,43 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, char d)
 	F.ns=ns;
 	F.ne=ne;
 	F.nw=nw;	
-	F.F=malloc(N*sizeof(double));
-	switch(d)
+	F.F=calloc(N,sizeof(double));
+	
+#define EPS 1e-10	
+	if (fabs(fx)+fabs(fy)<EPS)
 	{
-		case 'x': // partial derivative in x direction
-			if ((nw+ne)<=0)
-			{
-				fprintf(stderr,"Error: cannot make derivative in X direction without east or west elements\n");
-				exit(1);
-			}
-			if (nn+ns>0)
-			{
-				for (i=0;i<N;i++)
-					F.F[i]=dd*a[INDEX(m+deriv_m,i,M)];
-			}
-			else
-			{
-				for (i=0;i<N;i++)
-					F.F[i]=dd*a[INDEX(deriv_m,i,M)];
-			}
-			break;
-		case 'y':// partial derivative in y direction
-			if ((nn+ns)<=0)
-			{
-				fprintf(stderr,"Error: cannot make derivative in Y direction without north or south elements\n");
-				exit(1);
-			}
-			for (i=0;i<N;i++)
-				F.F[i]=dd*a[INDEX(deriv_m,i,M)];
-			break;
-		case 'n':// nabla operator
-			if ((nw+ne)<=0)
-			{
-				fprintf(stderr,"Error: cannot make a nabla operator without east or west elements\n");
-				exit(1);
-			}
-			if ((nn+ns)<=0)
-			{
-				fprintf(stderr,"Error: cannot make a nabla operator without north or south elements\n");
-				exit(1);
-			}
-			for (i=0;i<N;i++)
-				F.F[i]=dd*a[INDEX(deriv_m,i,M)];
-			for (i=0;i<N;i++)
-				F.F[i]+=dd*a[INDEX(m+deriv_m,i,M)];
-			break;
-		default:
-			fprintf(stderr,"Error: unkown dimention to make a partial derivative to. %c\n", d);
-			exit(1);
+		fprintf(stderr,"Error: you have to specify a non zero length direction vector\n");
+		exit(1);
 	}
+	
+	if (fabs(fx)/(fabs(fx)+fabs(fy)) > EPS)
+	{
+		if ((nw+ne)<=0)
+		{
+			fprintf(stderr,"Error: cannot make derivative in X direction without east or west elements\n");
+			exit(1);
+		}
+		if (nn+ns>0)
+		{
+			for (i=0;i<N;i++)
+				F.F[i]+=fx*dd*a[INDEX(m+deriv_m,i,M)];
+		}
+		else
+		{
+			for (i=0;i<N;i++)
+				F.F[i]+=fx*dd*a[INDEX(deriv_m,i,M)];
+		}
+	}
+	if (fabs(fy)/(fabs(fx)+fabs(fy)) > EPS)
+	{
+		if ((nn+ns)<=0)
+		{
+			fprintf(stderr,"Error: cannot make derivative in Y direction without north or south elements\n");
+			exit(1);
+		}
+		for (i=0;i<N;i++)
+			F.F[i]+=fy*dd*a[INDEX(deriv_m,i,M)];
+	}	
 	Transpose(F.F, (ne+nw+1), (nn+ns+1)); // I suppose I could modify LLS to avoid this step...
 	free(a);
 	return F;
@@ -269,7 +257,7 @@ void FreeFilter(filter *F)
 	F->F=NULL;
 }
 
-filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m, char d)
+filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy)
 /* 
  * nn: number values to the north
  * ns: number values to the south
@@ -309,7 +297,7 @@ filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m,
 				w+=j;
 			if (j>0)
 				e-=j;
-			F.set[(nn+i)*M+(nw+j)]=PartDeriv2D(n, s, w, e, deriv_m, m, d);
+			F.set[(nn+i)*M+(nw+j)]=PartDeriv2D(n, s, w, e, deriv_m, m, fx, fy);
 			//if ((n==nn)&&(s==ns)&&(e==ne)&&(w==nw))
 			//	PrintMat(F.set[(nn+i)*M+(nw+j)].F, (n+s+1), w+e+1);
 		}
@@ -332,7 +320,7 @@ void FreeFilterSet(filterset *F)
 }
 
 
-image ApplyFilter(image I, int ny, int nx, filterset F)
+image ApplyFilter(image I, int stepy, int stepx, filterset F)
 /* apply a filter set */
 {
 	int i, j, k,l;
@@ -349,27 +337,27 @@ image ApplyFilter(image I, int ny, int nx, filterset F)
 			/* OK this part is a bit of a disaster
 			 * We need to select the right filter such that we do not get out of the image bounds
 			 */
-			if (i-F.nn*ny<0)
-				ii=i-F.nn*ny-i%ny;
-			if (i+F.ns*ny-I.N+1>0)
-				ii=i+F.ns*ny-I.N+1+((I.N-1-i)%ny);
+			if (i-F.nn*stepy<0)
+				ii=i-F.nn*stepy-i%stepy;
+			if (i+F.ns*stepy-I.N+1>0)
+				ii=i+F.ns*stepy-I.N+1+((I.N-1-i)%stepy);
 				
-			if (j-F.nw*nx<0)
-				jj=j-F.nw*nx-(j%nx);
-			if (j+F.ne*nx-I.M+1>0)
-				jj=j+F.ne*nx-I.M+1+((I.M-1-j)%nx);
+			if (j-F.nw*stepx<0)
+				jj=j-F.nw*stepx-(j%stepx);
+			if (j+F.ne*stepx-I.M+1>0)
+				jj=j+F.ne*stepx-I.M+1+((I.M-1-j)%stepx);
 				
-			f=F.set[(F.nn+ii/ny)*(F.nw+F.ne+1)+(F.nw+jj/nx)];
+			f=F.set[(F.nn+ii/stepy)*(F.nw+F.ne+1)+(F.nw+jj/stepx)];
 			
 			for (k=-f.nn;k<=f.ns;k++)
 				for (l=-f.nw;l<=f.ne;l++)
-					s+=f.F[INDEX(k+f.nn,l+f.nw,f.nn+f.ns+1)]*I.I[INDEX(i+k*ny,j+l*nx,I.N)];
+					s+=f.F[INDEX(k+f.nn,l+f.nw,f.nn+f.ns+1)]*I.I[INDEX(i+k*stepy,j+l*stepx,I.N)];
 			R.I[INDEX(i,j,I.N)]=s;
 		}
 	return R;
 }
 
-image PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d)
+image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
 /* the basic interface:
  * input:
  * I: 		image in column major format 
@@ -382,13 +370,13 @@ image PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d)
 {	
 	filterset F;
 	image R;
-	F=DerivOperatorSet2D(nsurr, nsurr, nsurr, nsurr, deriv_m, m, d);
-	R=ApplyFilter(I, step, step, F);
+	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
+	R=ApplyFilter(I, stepy, stepx, F);
 	FreeFilterSet(&F);
 	return R;
 }
 
-image FFT_ApplyFilter(image I, int nx, int ny, filter F)
+image FFT_ApplyFilter(image I, int stepy, int stepx, filter F)
 {
     fftw_complex *FI=NULL, *FP=NULL, *P;
 	fftw_plan plan_inverse;
@@ -399,8 +387,8 @@ image FFT_ApplyFilter(image I, int nx, int ny, filter F)
 	int i, j, ii,jj, ww;
 	// create a filter image
 	PSF=calloc(I.N*I.M, sizeof(double));
-	for(i=-F.nn*ny;i<=F.ns*nx;i+=ny)
-		for (j=-F.nw*nx;j<=F.ne*nx;j+=nx)
+	for(i=-F.nn*stepy;i<=F.ns*stepx;i+=stepy)
+		for (j=-F.nw*stepx;j<=F.ne*stepx;j+=stepx)
 		{
 			ii=i;
 			jj=j;
@@ -408,7 +396,7 @@ image FFT_ApplyFilter(image I, int nx, int ny, filter F)
 				ii+=I.N;
 			if (j<0)
 				jj+=I.M;			
-			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i/ny, F.nw+j/nx,F.nn+F.ns+1)];
+			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i/stepy, F.nw+j/stepx,F.nn+F.ns+1)];
 		}
 	//PrintMat(PSF, I.N, I.M);
 	//PrintMat(F.F, F.nn*F.ns+1, F.nw*F.ne+1);
@@ -450,7 +438,7 @@ image FFT_ApplyFilter(image I, int nx, int ny, filter F)
     return R;
 }
 
-image FFT_PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char d)
+image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
 /* same as above only now using an fft. 
  * downside: edge effects as the FFT treats the image as periodic
  * upside: This routine's computation time is independant on the filter size and thus this routine is faster for larger filters
@@ -459,8 +447,8 @@ image FFT_PolynomalFilter(image I, int nsurr, int step, int m, int deriv_m, char
 {	
     image R;
 	filter F;
-	F=PartDeriv2D(nsurr, nsurr, nsurr, nsurr, deriv_m, m, d);
-	R=FFT_ApplyFilter(I, step, step, F);
+	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	R=FFT_ApplyFilter(I, stepy, stepx, F);
 	FreeFilter(&F);
     return R;
 }

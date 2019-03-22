@@ -7,8 +7,6 @@
 #include "floatimage.h"
 #include "filter.h"
 
-typedef enum {DX, DY, NABLA} filter_type;
-
 void Help(struct option OPTS[], char *desc[])
 {
 	int i=0;
@@ -34,11 +32,11 @@ int main(int argc, char **argv)
 {
 	image Iin, Iout;
 	char *fin=NULL, *fout=NULL, *ftxt=NULL;
-	int N=3, m=3, step=1; 
-	filter_type T=NABLA;
+	int Nx=3, Ny=3, m=3, stepx=1, stepy=1; 
 	int deriv_order=0, ItoV=0, FFT=0, c;
 	double Temp; 
-	char d='n';
+	double fx=1;
+	double fy=1;
 	
 	
 	
@@ -51,11 +49,14 @@ int main(int argc, char **argv)
 			{"txt-out",     required_argument, 0, 't'},
 			{"I2V",         required_argument, 0, 'V'},
 			{"N-filter",    required_argument, 0, 'N'},
+			{"Nxy-filter",  required_argument, 0, 'R'},
 			{"step",        required_argument, 0, 's'},
-			{"filter-order",required_argument, 0, 'm'},
+			{"stepxy",      required_argument, 0, 'r'},
+			{"polynomal-order",required_argument, 0, 'm'},
+			{"filter-order",required_argument, 0, 'M'},
 			{"dx",          required_argument, 0, 'x'},
 			{"dy",          required_argument, 0, 'y'},
-			{"nabla",       required_argument, 0, 'n'},
+			{"nabla",             no_argument, 0, 'n'},
 			{"fft",               no_argument, 0, 'f'},
 			{"help",              no_argument, 0, 'h'},
 			{0, 0, 0, 0}
@@ -66,17 +67,21 @@ int main(int argc, char **argv)
 			"\tspecify output text image filename\n\t\t\t(arg=filename or - for stdout)",
 			"\tconvert luminescence intensity to junction voltage\n\t\t\t(arg=temperature in K)",
 			"Size of the filter (arg=integer>0)",
-			"filter-order (arg=integer>0)",
-			"\tcreate derivative to x (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
-			"\tcreate derivative to y (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
-			"\tnabla operator (dx+dy) (arg=integer,\n\t\t\t0<=arg<=filter-order, the order of the derivative)",
+			"Size of the filter in x and y direction\n\t\t\t(arg=integer,integer>0)",
+			"\tstep size for sparse filters (arg=integer>0)",
+			"\tstep size in x and y direction for sparse filters\n\t\t\t(arg=integer,integer>0)",
+			"polynomal-order (arg=integer>0)",
+			"filter-order (arg=integer>0 and <= polynomal-order)",
+			"\tcontribution in x direction (arg=float)",
+			"\tcontribution in y direction (arg=float)",
+			"\tnabla operator (dx+dy)",
 			"\tuse the Fast Fourier Transform, makes computation\n\t\t\ttime independent of filter size but may lead to\n\t\t\tedge effects at the borders of the image",
 			"\tshow this help message and exit",
 			NULL};
 			
 		/* getopt_long stores the option index here. */
 		int option_index = 0;
-		c = getopt_long (argc, argv, "i:o:V:N:m:x:y:n:s:ft:h",long_options, &option_index);
+		c = getopt_long (argc, argv, "i:o:V:N:R:m:M:x:y:ns:r:ft:h",long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -125,56 +130,98 @@ int main(int argc, char **argv)
 			case 'N':
 				if (!optarg)
 				{
-					fprintf(stderr, "Error: --L_filter requires a length specification for the filter\n");
+					fprintf(stderr, "Error: --N_filter requires a length specification for the filter\n");
 					return 1;	
 				}
-				N=atoi(optarg);
+				Nx=Ny=atoi(optarg);
 				break;
+			case 'R':
+			{
+				char *r;
+				if (!optarg)
+				{
+					fprintf(stderr, "Error: --Nxy_filter requires a length specification for the filter\n");
+					return 1;	
+				}
+				r=optarg;
+				while ((*r)&&(*r!=','))
+					r++;
+				if (!*r)
+				{
+					fprintf(stderr, "Error: Nxy-filter requires and argument in the form <num>,<num> (without spaces!)\n");
+					return 1;
+				}
+				*r='\0';
+				r++;
+				Nx=atoi(optarg);
+				Ny=atoi(r);
+				break;
+			}
 			case 's':
 				if (!optarg)
 				{
-					fprintf(stderr, "Error: --L_filter requires a length specification for the filter\n");
+					fprintf(stderr, "Error: --step requires a length specification for the filter step\n");
 					return 1;	
 				}
-				step=atoi(optarg);
+				stepx=stepy=atoi(optarg);
 				break;
+			case 'r':
+			{
+				char *r;
+				if (!optarg)
+				{
+					fprintf(stderr, "Error: --stepxy requires a specification for the filter steps\n");
+					return 1;	
+				}
+				r=optarg;
+				while ((*r)&&(*r!=','))
+					r++;
+				if (!*r)
+				{
+					fprintf(stderr, "Error: --stepxy requires and argument in the form <num>,<num> (without spaces!)\n");
+					return 1;
+				}
+				*r='\0';
+				r++;
+				stepx=atoi(optarg);
+				stepy=atoi(r);
+				break;
+			}
 			case 'm':
 				if (!optarg)
 				{
-					fprintf(stderr, "Error: --L_filter requires a length specification for the filter\n");
+					fprintf(stderr, "Error: --polynomal-order requires an order specification\n");
 					return 1;	
 				}
 				m=atoi(optarg);
 				break;
+			case 'M':
+				if (!optarg)
+				{
+					fprintf(stderr, "Error: --filter-order requires an order specification\n");
+					return 1;	
+				}
+				deriv_order=atoi(optarg);
+				break;
 			case 'x':
 				if (!optarg)
 				{
-					fprintf(stderr, "Error: --Ident requires an epsilon specification for the filter (default 1e-12)\n");
+					fprintf(stderr, "Error: --dx requires a magnitude\n");
 					return 1;	
 				}
-				T=DX;
-				deriv_order=atoi(optarg);
-				d='x';
+				fx=atof(optarg);
 				break;
 			case 'y':
 				if (!optarg)
 				{
-					fprintf(stderr, "Error: --Ident requires an epsilon specification for the filter (default 1e-12)\n");
+					fprintf(stderr, "Error: --dy requires a magnitude\n");
 					return 1;	
 				}
-				T=DY;
-				deriv_order=atoi(optarg);
-				d='y';
+				fy=atof(optarg);
 				break;
 			case 'n':
-				if (!optarg)
-				{
-					fprintf(stderr, "Error: --Ident requires an epsilon specification for the filter (default 1e-12)\n");
-					return 1;	
-				}
-				T=NABLA;
-				deriv_order=atoi(optarg);
-				d='n';
+				fx=1;
+				fy=1;
 				break;
 			case 'f':
 				FFT=1;
@@ -205,20 +252,11 @@ int main(int argc, char **argv)
 	if (ItoV)
 		EL2Vj(Iin, Temp); // convert to junction voltages
 	
-	switch(T)
-	{
-		case DX:
-		case DY:
-		case NABLA:
-			if (FFT)
-				Iout=FFT_PolynomalFilter(Iin, N, step, m, deriv_order, d); // apply the filter
-			else
-				Iout=PolynomalFilter(Iin, N, step, m, deriv_order, d); // apply the filter
-			break;
-		default:
-			fprintf(stderr, "Error: check status of nuclear power planst in the vicinity cause this error cannot happen\n");
-			exit(1);
-	}
+	if (FFT)
+		Iout=FFT_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+	else
+		Iout=PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+	
 	if (fout)
 	{
 		FloatimageWrite(fout, Iout, 1,0,1);
