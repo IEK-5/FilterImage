@@ -320,16 +320,11 @@ void FreeFilterSet(filterset *F)
 }
 
 
-image ApplyFilter(image I, int stepy, int stepx, filterset F)
-/* apply a filter set */
+void PL_ApplyFilterRange(image I, image R, int row0, int rown, int col0, int colm, int stepy, int stepx, filterset F)
 {
 	int i, j, k,l;
-	image R;
-	R.I=malloc(I.N*I.M*sizeof(double));
-	R.N=I.N;
-	R.M=I.M;
-	for (i=0;i<I.N;i++)
-		for (j=0;j<I.M;j++)
+	for (i=row0;i<=rown;i++)
+		for (j=col0;j<=colm;j++)
 		{
 			double s=0;
 			filter f;
@@ -354,11 +349,24 @@ image ApplyFilter(image I, int stepy, int stepx, filterset F)
 					s+=f.F[INDEX(k+f.nn,l+f.nw,f.nn+f.ns+1)]*I.I[INDEX(i+k*stepy,j+l*stepx,I.N)];
 			R.I[INDEX(i,j,I.N)]=s;
 		}
+}
+
+
+
+
+image PL_ApplyFilter(image I, int stepy, int stepx, filterset F)
+/* apply a filter set using a plain convolution */
+{
+	image R;
+	R.I=malloc(I.N*I.M*sizeof(double));
+	R.N=I.N;
+	R.M=I.M;	
+	PL_ApplyFilterRange(I, R, 0, I.N-1, 0, I.M-1, stepy, stepx, F);
 	return R;
 }
 
-image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
-/* the basic interface:
+image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+/* the plain convolution filter
  * input:
  * I: 		image in column major format 
  * N,M: 	size of the image
@@ -371,12 +379,16 @@ image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int 
 	filterset F;
 	image R;
 	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
-	R=ApplyFilter(I, stepy, stepx, F);
+	R=PL_ApplyFilter(I, stepy, stepx, F);
 	FreeFilterSet(&F);
 	return R;
 }
 
+
+
+
 image FFT_ApplyFilter(image I, int stepy, int stepx, filter F)
+/* apply a filter set using the FFT for a fast convolution */
 {
     fftw_complex *FI=NULL, *FP=NULL, *P;
 	fftw_plan plan_inverse;
@@ -453,3 +465,61 @@ image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, 
     return R;
 }
 
+
+void PL_ApplyFilterEdge(image I, image R, int stepy, int stepx, filterset F)
+/* apply a plain convolution filter to the edge */
+{
+	filter f0;
+	f0=F.set[F.nn*(F.nw+F.ne+1)+F.nw];
+	int north, south, west, east, Rlast, Clast;
+	
+	Rlast=I.N-1;
+	Clast=I.M-1;
+	
+	north=f0.nn*stepy;
+	south=Rlast-f0.ns*stepy;
+	west=f0.nw*stepx;
+	east=Clast-f0.ne*stepy,
+	/* north edge */
+	PL_ApplyFilterRange(I, R, 0      , north  , 0   , Clast, stepy, stepx, F);
+	/* south edge */
+	PL_ApplyFilterRange(I, R, south  , Rlast  , 0   , Clast, stepy, stepx, F);
+	/* west edge */
+	PL_ApplyFilterRange(I, R, north+1, south-1, 0   , west , stepy, stepx, F);
+	/* east edge */
+	PL_ApplyFilterRange(I, R, north+1, south-1, east, Clast, stepy, stepx, F);	
+}
+
+
+image ApplyFilter(image I, int stepy, int stepx, filterset F)
+/* apply a filter set using a plain convolution */
+{
+	image R;
+	R.I=malloc(I.N*I.M*sizeof(double));
+	R.N=I.N;
+	R.M=I.M;	
+	/* first do an FFT convolution */
+	R=FFT_ApplyFilter(I, stepy, stepx,F.set[F.nn*(F.nw+F.ne+1)+F.nw]);	
+	/* redo the edge with more care */
+	PL_ApplyFilterEdge(I, R, stepy, stepx, F);
+	return R;
+}
+
+image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+/* use FFT for the center part of the image and the plain method for the edge
+ * input:
+ * I: 		image in column major format 
+ * N,M: 	size of the image
+ * nsurr:	number of elements to use in north, south, west, and east direction
+ * deriv_m:	which derivative to compute
+ * d:		dpecification of direction, x, y, or n (x+y)
+ * Returns a filtered image.
+ */
+{	
+	filterset F;
+	image R;
+	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
+	R=ApplyFilter(I, stepy, stepx, F);
+	FreeFilterSet(&F);
+	return R;
+}

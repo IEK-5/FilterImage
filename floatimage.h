@@ -7,11 +7,7 @@ typedef struct image {
 #define ROW(I,N)  ((I)%(N))
 #define COL(J,N)  ((J)/(N))
 
-image FloatimageRead(char *fn);
-void FloatimageWrite(char *fn, image I, int norm, double min, double max);
-void FloatimageDisplay(image I, int norm, double min, double max);
-void FloatimageTXTWrite(char *fn, image I);
-void Floatimage2stdout(image I);
+double * TransposeImageData(image I);
 void TransposeFloatImage(image *I);
 void FreeImage(image *I);
 void EL2Vj(image I, double T);

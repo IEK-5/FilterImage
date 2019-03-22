@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <string.h>
 #include "floatimage.h"
+#include "floatimage_io.h"
 #include "filter.h"
 
 void Help(struct option OPTS[], char *desc[])
@@ -33,7 +34,7 @@ int main(int argc, char **argv)
 	image Iin, Iout;
 	char *fin=NULL, *fout=NULL, *ftxt=NULL;
 	int Nx=3, Ny=3, m=3, stepx=1, stepy=1; 
-	int deriv_order=0, ItoV=0, FFT=0, c;
+	int deriv_order=0, ItoV=0, FFT=1, c;
 	double Temp; 
 	double fx=1;
 	double fy=1;
@@ -58,6 +59,7 @@ int main(int argc, char **argv)
 			{"dy",          required_argument, 0, 'y'},
 			{"nabla",             no_argument, 0, 'n'},
 			{"fft",               no_argument, 0, 'f'},
+			{"plain",             no_argument, 0, 'p'},
 			{"help",              no_argument, 0, 'h'},
 			{0, 0, 0, 0}
 		};
@@ -81,7 +83,7 @@ int main(int argc, char **argv)
 			
 		/* getopt_long stores the option index here. */
 		int option_index = 0;
-		c = getopt_long (argc, argv, "i:o:V:N:R:m:M:x:y:ns:r:ft:h",long_options, &option_index);
+		c = getopt_long (argc, argv, "i:o:V:N:R:m:M:x:y:ns:r:fpt:h",long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -224,7 +226,10 @@ int main(int argc, char **argv)
 				fy=1;
 				break;
 			case 'f':
-				FFT=1;
+				FFT=2;
+				break;
+			case 'p':
+				FFT=0;
 				break;
 			case '?':
 				/* getopt_long already printed an error message. */
@@ -251,11 +256,22 @@ int main(int argc, char **argv)
 	
 	if (ItoV)
 		EL2Vj(Iin, Temp); // convert to junction voltages
-	
-	if (FFT)
-		Iout=FFT_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
-	else
-		Iout=PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+		
+	switch(FFT)
+	{
+		case 0:
+			Iout=PL_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+			break;
+		case 1:
+			Iout=PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+			break;
+		case 2:
+			Iout=FFT_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+			break;
+		default:
+			fprintf(stderr,"Error: the sky is falling and I want my mommy\n");
+			exit(1);
+	}
 	
 	if (fout)
 	{
