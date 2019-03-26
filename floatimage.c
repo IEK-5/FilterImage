@@ -22,12 +22,11 @@ void TransposeFloatImage(image *I)
 	double *AA;
 	int i, D;
 	AA=TransposeImageData(*I);
-	for (i=0;i<I->N*I->M;i++)
-		I->I[i]=AA[i];
+	free(I->I);
+	I->I=AA;
 	D=I->M;
 	I->M=I->N;
 	I->N=D;
-	free(AA);
 }
 
 void FreeImage(image *I)

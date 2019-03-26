@@ -62,6 +62,7 @@ int main(int argc, char **argv)
 			{"plain",             no_argument, 0, 'p'},
 			{"hybrid",            no_argument, 0, 'H'},
 			{"help",              no_argument, 0, 'h'},
+			{"test",              no_argument, 0, 0},
 			{0, 0, 0, 0}
 		};
 		char *desc[]={
@@ -82,6 +83,7 @@ int main(int argc, char **argv)
 			"\tuse a plain (slow) convolution method",
 			"\tuse a hybrid convolution method (FFT for the bulk\n\t\t\tand plain for the edges",
 			"\tshow this help message and exit",
+			"\ttest the fft convolution with a plain convolution",
 			NULL};
 			
 		/* getopt_long stores the option index here. */
@@ -231,6 +233,9 @@ int main(int argc, char **argv)
 			case 'f':
 				FFT=2;
 				break;
+			case 0:
+				FFT=3;
+				break;
 			case 'p':
 				FFT=0;
 				break;
@@ -273,6 +278,9 @@ int main(int argc, char **argv)
 			break;
 		case 2: //FFT method
 			Iout=FFT_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy); // apply the filter
+			break;
+		case 3: //check
+			Iout=CheckFFTvsPlain(Iin, Ny, Nx, stepy, stepx, m, deriv_order, fx, fy);
 			break;
 		default:
 			fprintf(stderr,"Error: the sky is falling and I want my mommy\n");
