@@ -344,6 +344,11 @@ void PL_ApplyFilterRange(image I, image R, int row0, int rown, int col0, int col
 				
 			f=F.set[(F.nn+ii/stepy)*(F.nw+F.ne+1)+(F.nw+jj/stepx)];
 			
+			if ((i-f.nn*stepy<0)||(i+f.ns*stepy>=I.N)||(j-f.nw*stepx<0)||(j+f.ne*stepx>=I.M))
+			{
+				fprintf(stderr, "Error: filter too large for image in PL_ApplyFilterRange\n");
+				exit(1);
+			}
 			for (k=-f.nn;k<=f.ns;k++)
 				for (l=-f.nw;l<=f.ne;l++)
 					s+=f.F[INDEX(k+f.nn,l+f.nw,f.nn+f.ns+1)]*I.I[INDEX(i+k*stepy,j+l*stepx,I.N)];
@@ -407,7 +412,12 @@ image FFT_ApplyFilter(image I, int stepy, int stepx, filter F)
 			if (i<0)
 				ii+=I.N;
 			if (j<0)
-				jj+=I.M;			
+				jj+=I.M;	
+			if ((ii<0)||(ii>=I.N)||(jj<0)||(jj>=I.M))
+			{
+				fprintf(stderr, "Error: filter too large for image in FFT_ApplyFilter\n");
+				exit(1);
+			}					
 			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i/stepy, F.nw+j/stepx,F.nn+F.ns+1)];
 		}
 	//PrintMat(PSF, I.N, I.M);
@@ -522,4 +532,60 @@ image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int 
 	R=ApplyFilter(I, stepy, stepx, F);
 	FreeFilterSet(&F);
 	return R;
+}
+
+image TestConvolution(image I, image T, int stepy, int stepx, filter F)
+/* test FFT and plain convolution methods agianst each other */
+{
+	int i, j, k,l, ii, jj;
+	double s, r=0, ref=0;
+	image R;
+	
+	if ((T.N!=I.N)||(T.M!=I.M))
+	{
+		fprintf(stderr, "Error: TestConvolution got two images with different dimensions\n");
+		exit(1);
+	}
+	
+	R.I=malloc(I.N*I.M*sizeof(double));
+	R.N=I.N;
+	R.M=I.M;
+	for (i=0;i<I.N;i++)
+		for (j=0;j<I.M;j++)
+		{
+			s=0;
+			for (k=-F.nn;k<=F.ns;k++)
+				for (l=-F.nw;l<=F.ne;l++)
+				{
+					ii=i+k*stepy;
+					jj=j+l*stepx;
+					while (ii<0)
+						ii+=I.N;
+					while (ii>I.N)
+						ii-=I.N;
+					while (jj<0)
+						jj+=I.M;
+					while (jj>I.M)
+						jj-=I.M;
+					s+=F.F[INDEX(k+F.nn,l+F.nw,F.nn+F.ns+1)]*I.I[INDEX(ii,jj,I.N)];
+				}
+			R.I[INDEX(i,j,I.N)]=(T.I[INDEX(i,j,I.N)]-s);
+			r+=R.I[INDEX(i,j,I.N)]*R.I[INDEX(i,j,I.N)];
+			ref+=s*s;
+		}
+	r/=(double)(I.N*I.M);
+	ref/=(double)(I.N*I.M);
+	printf("avg:%e %e\n", sqrt(r), sqrt(ref));
+	return R;					
+}
+image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+{	
+    image R1, R2;
+	filter F;
+	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	R1=FFT_ApplyFilter(I, stepy, stepx, F);
+	R2=TestConvolution(I, R1, stepy, stepx, F);
+	FreeFilter(&F);
+	FreeImage(&R1);
+	return R2;
 }
