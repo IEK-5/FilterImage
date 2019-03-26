@@ -1,3 +1,5 @@
+#ifndef FLOATIMAGE_H
+#define FLOATIMAGE_H
 typedef struct image {
 	double *I; // images must in column major format
 	int N, M;
@@ -14,3 +16,4 @@ void EL2Vj(image I, double T);
 void Vj2EL(image I, double T);
 image NormalizeImageRange(image I, double min, double max);
 image TestImage(int N, int M, double p);
+#endif
