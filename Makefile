@@ -7,7 +7,7 @@ HDR=floatimage.h floatimage_io.h filter.h
 TARGET=FilterImage
 
 $(TARGET): $(OBJ)
-	$(CC) -o $(TARGET) $(OBJ) $(LFLAGS) 
+	$(CC) -o $(TARGET) $(OBJ) $(LFLAGS)
 filter.o: floatimage.h filter.h
 floatimage_io.o: floatimage.h filter.h
 main.o: floatimage_io.h floatimage.h filter.h

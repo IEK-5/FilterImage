@@ -1,6 +1,7 @@
 #ifndef FILTER_H
 #define FILTER_H
 #include "floatimage.h"
+
 typedef struct filter {
 	int nn, ns, ne, nw;
 	double * F;
@@ -27,6 +28,7 @@ image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, 
 // mix of plain and FFT routines, try to be fast without edge effects
 image ApplyFilter(image I, int stepy, int stepx,  filterset F);
 image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy);
-#endif
 
 image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy);
+
+#endif
