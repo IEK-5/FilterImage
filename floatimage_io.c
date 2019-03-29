@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <wand/MagickWand.h>
+#include "error.h"
 #include "floatimage.h"
 
 /* magickwand error handler */
@@ -186,8 +187,10 @@ void FloatimageTXTWrite(char *fn, image I)
 	
 	if ((f=fopen(fn,"w"))==NULL)
 	{
-		fprintf(stderr, "Error: cannot open file %s for reading\n", fn);
-		exit(1);
+		
+		// ERRORFLAG ERROFILEW  "cannot open file for writing"
+		AddErr(ERROFILEW);
+		return;
 	}
 	for (i=0;i<I.N;i++)
 	{

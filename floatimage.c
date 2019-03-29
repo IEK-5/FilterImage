@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "error.h"
 #include "floatimage.h"
 
 /* transpose image data: created a newly allocated image data transposed */
@@ -20,7 +21,7 @@ double * TransposeImageData(image I)
 void TransposeFloatImage(image *I)
 {
 	double *AA;
-	int i, D;
+	int D;
 	AA=TransposeImageData(*I);
 	free(I->I);
 	I->I=AA;
@@ -53,11 +54,16 @@ image NormalizeImageRange(image I, double min, double max)
 	}
 	if (fabs(dmax-dmin)/fabs(dmin+dmax)<1e-10)
 	{
-		fprintf(stderr, "Error: cannot normalize float image %e %e\n", dmin, dmax);
-		exit(1);
+		// ERRORFLAG ERRNORMIM  "cannot normalize float image"
+		AddErr(ERRNORMIM);
+		f=10;
+		c=0;
 	}
-	f=(max-min)/(dmax-dmin);
-	c=min-f*dmin;
+	else
+	{
+		f=(max-min)/(dmax-dmin);
+		c=min-f*dmin;
+	}
 	R.I=malloc(I.N*I.M*sizeof(double));
 	R.N=I.N;
 	R.M=I.M;

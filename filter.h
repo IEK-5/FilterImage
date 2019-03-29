@@ -30,5 +30,4 @@ image ApplyFilter(image I, int stepy, int stepx,  filterset F);
 image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy);
 
 image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy);
-
 #endif

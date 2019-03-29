@@ -3,11 +3,16 @@
 #include <math.h>
 #include <fftw3.h>
 #include "floatimage.h"
+#include "error.h"
 #include "filter.h"
 
 void dgetrf_(int* M, int *N, double* A, int* lda, int* IPIV, int* INFO);
 void dgetri_(int* N, double* A, int* lda, int* IPIV, double* WORK, int* lwork, int* INFO);
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA, double *B, int *LDB, double *BETA, double *C,int *LDC); 
+
+image null_image = {NULL, 0, 0};
+filter null_filter = {0, 0, 0, 0, NULL};
+filterset null_filterset = {0, 0, 0, 0, NULL};
 
 void Transpose(double *A, int N, int M)
 {
@@ -29,8 +34,9 @@ void MMultABT(int Na, int Ma, int Nb, int Mb, double *A, double *B, double *R)
 	double one = 1.0, zero = 0.0;
 	if (Ma!=Mb)
 	{
-		fprintf(stderr,"Error: cannot multiply matrices, domensions do not match\n");
-		exit(1);
+		// ERRORFLAG ERRMATDIM  "cannot multiply matrices, dimensions do not match"
+		AddErr(ERRMATDIM);
+		return;
 	}
 
 	dgemm_(&transA, &transB, &Na, &Nb, &Ma, &one, A,&Na, B, &Nb, &zero, R, &Na);
@@ -107,23 +113,27 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 	int I,J,i,j;
 	if (nn<0)
 	{
-		fprintf(stderr,"Error: number of north elements may not be negative\n");
-		exit(1);
+		// ERRORFLAG ERRNEGNORTH  "number of north elements may not be negative"
+		AddErr(ERRNEGNORTH);
+		return NULL;
 	}
 	if (ns<0)
 	{
-		fprintf(stderr,"Error: number of south elements may not be negative\n");
-		exit(1);
+		// ERRORFLAG ERRNEGSOUTH  "number of south elements may not be negative"
+		AddErr(ERRNEGSOUTH);
+		return NULL;
 	}
 	if (nw<0)
 	{
-		fprintf(stderr,"Error: number of west elements may not be negative\n");
-		exit(1);
+		// ERRORFLAG ERRNEGWEST  "number of south elements may not be negative"
+		AddErr(ERRNEGWEST);
+		return NULL;
 	}
 	if (ne<0)
 	{
-		fprintf(stderr,"Error: number of east elements may not be negative\n");
-		exit(1);
+		// ERRORFLAG ERRNEGEAST  "number of south elements may not be negative"
+		AddErr(ERRNEGEAST);
+		return NULL;
 	}
 	
 	N=(nn+ns+1)*(nw+ne+1);	
@@ -131,8 +141,9 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 	
 	if (M>N)
 	{
-		fprintf(stderr,"Error: number of datapoints not sufficient for the polynomal order\n");
-		exit(1);
+		// ERRORFLAG ERRKERNELTOSMALL  "kernel too small for polynomal order"
+		AddErr(ERRKERNELTOSMALL);
+		return NULL;
 	}
 	
 	A=malloc((N*M)*sizeof(double));
@@ -161,6 +172,8 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 	
 	free(A);
 	free(AA);
+	if (ERRORSTATE)
+		return NULL;
 	return a;
 }
 
@@ -185,7 +198,9 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx
 	int i;
 
 	a=LLS(nn, ns, nw, ne, m);
-	
+	if (ERRORSTATE)
+		return null_filter;
+		
 	N=(nn+ns+1)*(nw+ne+1);	
 	M=((nn+ns>0)+(ne+nw>0))*m+1;
 	
@@ -203,16 +218,19 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx
 #define EPS 1e-10	
 	if (fabs(fx)+fabs(fy)<EPS)
 	{
-		fprintf(stderr,"Error: you have to specify a non zero length direction vector\n");
-		exit(1);
+		
+		// ERRORFLAG ERRZERODIR  "you have to specify a non zero length direction vector"
+		AddErr(ERRZERODIR);
+		return null_filter;
 	}
 	
 	if (fabs(fx)/(fabs(fx)+fabs(fy)) > EPS)
 	{
 		if ((nw+ne)<=0)
 		{
-			fprintf(stderr,"Error: cannot make derivative in X direction without east or west elements\n");
-			exit(1);
+			// ERRORFLAG ERRDXNOX  "cannot make derivative in X direction without east or west elements"
+			AddErr(ERRDXNOX);
+			return null_filter;
 		}
 		if (nn+ns>0)
 		{
@@ -229,8 +247,9 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx
 	{
 		if ((nn+ns)<=0)
 		{
-			fprintf(stderr,"Error: cannot make derivative in Y direction without north or south elements\n");
-			exit(1);
+			// ERRORFLAG ERRDYNOY  "cannot make derivative in Y direction without north or south elements"
+			AddErr(ERRDYNOY);
+			return null_filter;
 		}
 		for (i=0;i<N;i++)
 			F.F[i]+=fy*dd*a[INDEX(deriv_m,i,M)];
@@ -298,6 +317,8 @@ filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m,
 			if (j>0)
 				e-=j;
 			F.set[(nn+i)*M+(nw+j)]=PartDeriv2D(n, s, w, e, deriv_m, m, fx, fy);
+			if (ERRORSTATE)
+				return null_filterset;
 			//if ((n==nn)&&(s==ns)&&(e==ne)&&(w==nw))
 			//	PrintMat(F.set[(nn+i)*M+(nw+j)].F, (n+s+1), w+e+1);
 		}
@@ -346,8 +367,9 @@ void PL_ApplyFilterRange(image I, image R, int row0, int rown, int col0, int col
 			
 			if ((i-f.nn*stepy<0)||(i+f.ns*stepy>=I.N)||(j-f.nw*stepx<0)||(j+f.ne*stepx>=I.M))
 			{
-				fprintf(stderr, "Error: filter too large for image in PL_ApplyFilterRange\n");
-				exit(1);
+				// ERRORFLAG ERRFILTERTOOBIG  "filter too large for image"
+				AddErr(ERRFILTERTOOBIG);
+				return;
 			}
 			for (k=-f.nn;k<=f.ns;k++)
 				for (l=-f.nw;l<=f.ne;l++)
@@ -384,6 +406,8 @@ image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, i
 	filterset F;
 	image R;
 	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
+	if (ERRORSTATE)
+		return null_image;
 	R=PL_ApplyFilter(I, stepy, stepx, F);
 	FreeFilterSet(&F);
 	return R;
@@ -415,8 +439,8 @@ image FFT_ApplyFilter(image I, int stepy, int stepx, filter F)
 				jj+=I.M;	
 			if ((ii<0)||(ii>=I.N)||(jj<0)||(jj>=I.M))
 			{
-				fprintf(stderr, "Error: filter too large for image in FFT_ApplyFilter\n");
-				exit(1);
+				AddErr(ERRFILTERTOOBIG);
+				return null_image;
 			}					
 			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i/stepy, F.nw+j/stepx,F.nn+F.ns+1)];
 		}
@@ -470,6 +494,8 @@ image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, 
     image R;
 	filter F;
 	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	if (ERRORSTATE)
+		return null_image;
 	R=FFT_ApplyFilter(I, stepy, stepx, F);
 	FreeFilter(&F);
     return R;
@@ -509,9 +535,13 @@ image ApplyFilter(image I, int stepy, int stepx, filterset F)
 	R.N=I.N;
 	R.M=I.M;	
 	/* first do an FFT convolution */
-	R=FFT_ApplyFilter(I, stepy, stepx,F.set[F.nn*(F.nw+F.ne+1)+F.nw]);	
+	R=FFT_ApplyFilter(I, stepy, stepx,F.set[F.nn*(F.nw+F.ne+1)+F.nw]);
+	if (ERRORSTATE)
+		return null_image;
 	/* redo the edge with more care */
 	PL_ApplyFilterEdge(I, R, stepy, stepx, F);
+	if (ERRORSTATE)
+		return null_image;
 	return R;
 }
 
@@ -529,13 +559,19 @@ image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int 
 	filterset F;
 	image R;
 	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
+	if (ERRORSTATE)
+		return null_image;
 	R=ApplyFilter(I, stepy, stepx, F);
+	if (ERRORSTATE)
+		return null_image;
 	FreeFilterSet(&F);
 	return R;
 }
 
 image TestConvolution(image I, image T, int stepy, int stepx, filter F)
 /* test FFT and plain convolution methods agianst each other */
+/* here we reimplement the plain convolution to use only one filter and periodically continue the image */
+/* This way the fft and plain convolution should be equal */
 {
 	int i, j, k,l, ii, jj;
 	double s, r=0, ref=0;
@@ -543,8 +579,9 @@ image TestConvolution(image I, image T, int stepy, int stepx, filter F)
 	
 	if ((T.N!=I.N)||(T.M!=I.M))
 	{
-		fprintf(stderr, "Error: TestConvolution got two images with different dimensions\n");
-		exit(1);
+		// ERRORFLAG ERRTESTCONV  "TestConvolution got two images with different dimensions"
+		AddErr(ERRTESTCONV);
+		return null_image;
 	}
 	
 	R.I=malloc(I.N*I.M*sizeof(double));
@@ -561,11 +598,11 @@ image TestConvolution(image I, image T, int stepy, int stepx, filter F)
 					jj=j+l*stepx;
 					while (ii<0)
 						ii+=I.N;
-					while (ii>I.N)
+					while (ii>=I.N)
 						ii-=I.N;
 					while (jj<0)
 						jj+=I.M;
-					while (jj>I.M)
+					while (jj>=I.M)
 						jj-=I.M;
 					s+=F.F[INDEX(k+F.nn,l+F.nw,F.nn+F.ns+1)]*I.I[INDEX(ii,jj,I.N)];
 				}
@@ -575,7 +612,7 @@ image TestConvolution(image I, image T, int stepy, int stepx, filter F)
 		}
 	r/=(double)(I.N*I.M);
 	ref/=(double)(I.N*I.M);
-	printf("avg:%e %e\n", sqrt(r), sqrt(ref));
+	printf("avg error:%e RMS value %e\n", sqrt(r), sqrt(ref));
 	return R;					
 }
 image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
@@ -583,9 +620,19 @@ image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int 
     image R1, R2;
 	filter F;
 	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	if (ERRORSTATE)
+		return null_image;
 	R1=FFT_ApplyFilter(I, stepy, stepx, F);
+	if (ERRORSTATE)
+	{
+		FreeFilter(&F);
+		return null_image;
+	}
 	R2=TestConvolution(I, R1, stepy, stepx, F);
+	
 	FreeFilter(&F);
 	FreeImage(&R1);
+	if (ERRORSTATE)
+		return null_image;
 	return R2;
 }

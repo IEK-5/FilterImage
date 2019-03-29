@@ -7,6 +7,7 @@
 #include "floatimage.h"
 #include "floatimage_io.h"
 #include "filter.h"
+#include "error.h"
 
 void Help(struct option OPTS[], char *desc[])
 {
@@ -88,7 +89,7 @@ int main(int argc, char **argv)
 			
 		/* getopt_long stores the option index here. */
 		int option_index = 0;
-		c = getopt_long (argc, argv, "i:o:V:N:R:m:M:x:y:ns:r:fpHh",long_options, &option_index);
+		c = getopt_long (argc, argv, "i:o:t:V:N:R:m:M:x:y:ns:r:fpHh",long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -286,7 +287,11 @@ int main(int argc, char **argv)
 			fprintf(stderr,"Error: the sky is falling and I want my mommy\n");
 			exit(1);
 	}
-	
+	if (ERRORSTATE)
+	{
+		E_Messages();
+		return 1;
+	}
 	if (fout)
 	{
 		FloatimageWrite(fout, Iout, 1,0,1);
