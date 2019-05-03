@@ -9,6 +9,7 @@
 void dgetrf_(int* M, int *N, double* A, int* lda, int* IPIV, int* INFO);
 void dgetri_(int* N, double* A, int* lda, int* IPIV, double* WORK, int* lwork, int* INFO);
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA, double *B, int *LDB, double *BETA, double *C,int *LDC); 
+void dgesdd_(char* JOBZ, int* M, int* N, double* A, int* LDA, double* S, double* U, int* LDU, double* VT, int* LDVT, double* WORK, int* LWORK, int* IWORK, int* INFO);
 
 image null_image = {NULL, 0, 0};
 filter null_filter = {0, 0, 0, 0, NULL};
@@ -95,6 +96,60 @@ void inverse(double* A, int N)
 
     free(IPIV);
     free(WORK);
+}
+
+void lsfit_proj_svd(int M, int N, double* A, double tol, double *R)
+/*
+ * Compute SVD (A := U \Sigma V^T) and a projection operator in the
+ * least squares fit: V \Sigma^+ U^T
+ *
+ * M:   number of rows
+ * N:   number of columns
+ * A:   matrix A
+ * tol: tolerance during pseudo-inversion
+ * R:   result
+ *
+ */
+{
+  int m=M, n=N, lda=M, ldu=M, ldvt=N, info, lwork, *iwork;
+  double wkopt, *work, *S, *U, *VT;
+  // iwork dimension should be at least 8*min(m,n)
+  iwork = (int*)malloc( 8*n*sizeof(int) );
+  S = (double*)malloc( n*sizeof(double) );
+  U = (double*)malloc( ldu*n*sizeof(double) );
+  VT = (double*)malloc( ldvt*n*sizeof(double) );
+
+  // compute optimal lwork
+  lwork = -1;
+  dgesdd_("S",&m,&n,A,&lda,S,U,&ldu,VT,&ldvt,
+          &wkopt,&lwork,iwork,&info);
+  lwork=(int)wkopt;
+  work = (double*)malloc( lwork*sizeof(double) );
+
+  // compute svd
+  dgesdd_("S",&m,&n,A,&lda,S,U,&ldu,VT,&ldvt,
+          work,&lwork,iwork,&info);
+
+  if (info>0)
+  {
+    // ERRORFLAG ERRLPCKRNTF "LAPACK run-time failure"
+    AddErr(ERRLPCKRNTF);
+    return;
+  }
+
+  // V^T (U \Sigma^+)^T
+  int i,j;
+  for (i=0;i<n;++i)
+    for (j=0;j<ldu;++j)
+      U[INDEX(j,i,ldu)] *= (fabs(S[i]) > tol? 1/S[i] : 0);
+  Transpose(VT,n,n);
+  MMultABT(n,n,ldu,n,VT,U,R);
+
+  free(work);
+  free(VT);
+  free(U);
+  free(S);
+  free(iwork);
 }
 
 double *LLS(int nn, int ns, int nw, int ne, int m)
