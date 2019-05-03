@@ -109,8 +109,10 @@ void FloatimageWrite(char *fn, image I, int norm, double min, double max)
 	// wrap it up
 	if(wand)
 		wand = DestroyMagickWand(wand);
-	
-    free(data);
+	if (p_wand)
+		p_wand = DestroyPixelWand(p_wand);
+
+	free(data);
 	if (norm)
 		FreeImage(&N);
 	MagickWandTerminus();
