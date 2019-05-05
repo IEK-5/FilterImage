@@ -10,6 +10,9 @@ void dgetrf_(int* M, int *N, double* A, int* lda, int* IPIV, int* INFO);
 void dgetri_(int* N, double* A, int* lda, int* IPIV, double* WORK, int* lwork, int* INFO);
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA, double *B, int *LDB, double *BETA, double *C,int *LDC); 
 void dgesdd_(char* JOBZ, int* M, int* N, double* A, int* LDA, double* S, double* U, int* LDU, double* VT, int* LDVT, double* WORK, int* LWORK, int* IWORK, int* INFO);
+void dgeqp3_(int* M, int* N, double* A, int* LDA, int* JPVT, double* TAU, double* WORK, int* LWORK, int* INFO);
+void dtrsm_(char* SIDE, char* UPLO, char* TRANSA, char* DIAG, int *M, int *N, double* ALPHA, double *A, int* LDA, double *B, int* LDB);
+void dorgqr_(int* M, int* N, int* K, double *A, int* LDA, double *TAU, double *WORK, int* LWORK, int* INFO);
 
 image null_image = {NULL, 0, 0};
 filter null_filter = {0, 0, 0, 0, NULL};
@@ -96,6 +99,105 @@ void inverse(double* A, int N)
 
     free(IPIV);
     free(WORK);
+}
+
+int qr(int M, int N, double *A, int *JPVT, double *TAU)
+{
+  int m=M, n=N, lda=M, info, lwork;
+  double *work, wkopt;
+
+  lwork = -1;
+  dgeqp3_(&m, &n, A, &lda, JPVT, TAU,
+          &wkopt, &lwork, &info);
+  lwork = (int)wkopt;
+  work = (double*)malloc( lwork*sizeof(double) );
+  dgeqp3_(&m, &n, A, &lda, JPVT, TAU,
+          work, &lwork, &info);
+  free(work);
+
+  return info;
+}
+
+int qrQ(int M, int N, int RK, double *A, double *TAU)
+{
+  int m=M, n=N, rk = RK, lda=M, info, lwork;
+  double *work, wkopt;
+
+  lwork = -1;
+  dorgqr_(&m,&n,&rk,A,&lda,TAU,
+          &wkopt,&lwork,&info);
+  lwork = (int)wkopt;
+  work = (double*)malloc( lwork*sizeof(double) );
+  dorgqr_(&m,&n,&rk,A,&lda,TAU,
+          work,&lwork,&info);
+  free(work);
+
+  return info;
+}
+
+void lsfit_proj_qr(int M, int N, double* A, double tol, double *RES)
+/*
+ * Compute projection operator of the least squares fit using QR
+ * decomposition
+ *
+ * M:   number of rows
+ * N:   number of columns
+ * A:   matrix A
+ * tol: tolerance during pseudo-inversion
+ * RES:   result
+ *
+ */
+{
+  int *jpvt;
+  jpvt = (int*)malloc( N*sizeof(int) );
+  for (int i=0; i < N; ++i) jpvt[i] = 0;
+
+  double *tau, *R;
+  tau = (double*)malloc( N*sizeof(double) );
+  R = (double*)malloc( N*N*sizeof(double) );
+
+  // compute QR
+  if (qr(M,N,A,jpvt,tau)) {
+    // ERRORFLAG ERRLPCKRNTF "LAPACK run-time failure"
+    AddErr(ERRLPCKRNTF);
+    return;
+  }
+
+  // compute rank
+  int rk;
+  for (rk=0; rk < N; ++rk) {
+    if (fabs(A[INDEX(rk,rk,M)]) < tol)
+      break;
+
+    for (int i=0; i <= rk; ++i)
+      R[INDEX(i,rk,N)] = A[INDEX(i,rk,M)];
+  }
+
+  // compute Q^T I
+  if (qrQ(M,N,rk,A,tau))
+  {
+    // ERRORFLAG ERRLPCKRNTF "LAPACK run-time failure"
+    AddErr(ERRLPCKRNTF);
+    return;
+  }
+  Transpose(A,M,N);
+
+  // invert triangular R
+  double alpha = 1;
+  int m = M, n = N;
+  dtrsm_("L","U","N","N",&n,&m,&alpha,R,&n,A,&n);
+
+  // write result in RES
+  for (int i=0; i < N; ++i)
+    for (int j=0; j < M; ++j)
+      if (i+1 > rk)
+        RES[INDEX(jpvt[i]-1,j,N)] = 0;
+      else
+        RES[INDEX(jpvt[i]-1,j,N)] = A[INDEX(i,j,N)];
+
+  free(R);
+  free(tau);
+  free(jpvt);
 }
 
 void lsfit_proj_svd(int M, int N, double* A, double tol, double *R)
@@ -241,6 +343,8 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 	a=malloc((N*M)*sizeof(double));
 
 	lsfit_proj_inverse(M,N,A,a);
+	//lsfit_proj_qr(N,M,A,1e-7,a);
+	//lsfit_proj_svd(N,M,A,1e-7,a);
 
 	free(A);
 	if (ERRORSTATE)
