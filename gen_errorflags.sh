@@ -18,7 +18,7 @@ NERR=0;
 for s in $@
 do
 	echo Collecting error flags from $s
-	egrep -o '// ERRORFLAG.*' $s >>tmperrflags
+	egrep -o '// ERRORFLAG.*' $s | sort | uniq >>tmperrflags
 done
 
 # create the error flag defines
