@@ -32,18 +32,25 @@ void Transpose(double *A, int N, int M)
 	free(AA);
 }
 
-void MMultABT(int Na, int Ma, int Nb, int Mb, double *A, double *B, double *R)
+void MMult(char *transA, char *transB, int Na, int Ma, int Nb, int Mb, double *A, double *B, double *R)
+/*
+ * Multiply two matrices. Note, A and B *must* be different pointers,
+ * though I don't see it in the LAPACK documentation
+ *
+ */
 {
-	char transA = 'N', transB = 'T';
-	double one = 1.0, zero = 0.0;
-	if (Ma!=Mb)
-	{
-		// ERRORFLAG ERRMATDIM  "cannot multiply matrices, dimensions do not match"
-		AddErr(ERRMATDIM);
-		return;
-	}
+  double one = 1.0, zero = 0.0;
+  if ((*transA == 'N' && *transB == 'T' && Ma!=Mb) ||
+      (*transA == 'N' && *transB == 'N' && Ma!=Nb) ||
+      (*transA == 'T' && *transB == 'N' && Na!=Nb) ||
+      (*transA == 'T' && *transB == 'T' && Na!=Mb))
+  {
+    // ERRORFLAG ERRMATDIM  "cannot multiply matrices, dimensions do not match"
+    AddErr(ERRMATDIM);
+    return;
+  }
 
-	dgemm_(&transA, &transB, &Na, &Nb, &Ma, &one, A,&Na, B, &Nb, &zero, R, &Na);
+  dgemm_(transA, transB, &Na, &Nb, &Ma, &one, A,&Na, B, &Nb, &zero, R, &Na);
 }
 
 void ATA_(int N, int M, double *a, double *r)
@@ -249,8 +256,7 @@ void lsfit_proj_svd(int M, int N, double* A, double tol, double *R)
   for (i=0;i<N;++i)
     for (j=0;j<M;++j)
       U[INDEX(j,i,M)] *= (fabs(S[i]) > tol? 1/S[i] : 0);
-  Transpose(VT,N,N);
-  MMultABT(N,N,M,N,VT,U,R);
+  MMult("T","T",N,N,M,N,VT,U,R);
 
   free(VT);
   free(U);
@@ -273,7 +279,7 @@ void lsfit_proj_inverse(int M, int N, double *A, double *R)
   AA=malloc((M*M)*sizeof(double));
   ATA(N, M, A, AA); // AA=A^T A
 	inverse(AA, M); // AA=(A^T A)^-1
-  MMultABT(M, M, N, M, AA, A, R); // a=(A^T A)^-1 A^T
+  MMult("N","T",M, M, N, M, AA, A, R); // a=(A^T A)^-1 A^T
   free(AA);
 }
 
