@@ -309,8 +309,29 @@ void lsfit_proj_inverse(int M, int N, double *A, double *R)
 {
   double *AA;
   AA=malloc((M*M)*sizeof(double));
+  //MMult("T","N",N, M, N, M, A, A, AA); // AA=A^T A doesn't work correctly...
   ATA(N, M, A, AA); // AA=A^T A
 	inverse(AA, M); // AA=(A^T A)^-1
+  MMult("N","T",M, M, N, M, AA, A, R); // a=(A^T A)^-1 A^T
+  free(AA);
+}
+
+void lsfit_proj_pseudo_inverse(int M, int N, double *A, double *R)
+/*
+ * Compute a projection operator in the least squares using direct
+ * computation of the formula (A^T A)^-1 A
+ *
+ * M:   number of rows
+ * N:   number of columns
+ * A:   matrix A
+ * R:   result
+ *
+ */
+{
+  double *AA;
+  AA=malloc((M*M)*sizeof(double));
+  ATA(N, M, A, AA); // AA=A^T A
+  pseudo_inverse(AA, M, 1e-7); // AA=(A^T A)^-1
   MMult("N","T",M, M, N, M, AA, A, R); // a=(A^T A)^-1 A^T
   free(AA);
 }
@@ -383,7 +404,8 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 	}
 	a=malloc((N*M)*sizeof(double));
 
-	lsfit_proj_inverse(M,N,A,a);
+	//lsfit_proj_inverse(M,N,A,a);
+	lsfit_proj_pseudo_inverse(M,N,A,a);
 	//lsfit_proj_qr(N,M,A,1e-7,a);
 	//lsfit_proj_svd(N,M,A,1e-7,a);
 
