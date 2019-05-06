@@ -161,6 +161,38 @@ int svd(int M, int N, double *A, double *S, double *U, double *VT)
   return info;
 }
 
+void pseudo_inverse(double* A, int N, double tol)
+/*
+ * Compute pseudo inverse matrix using qr decomposition
+ *
+ * A: column-wise square matrix. The matrix is overwritten
+ * N: number of columns
+ *
+ */
+{
+  double *S, *U, *VT;
+  S = (double*)malloc( N*sizeof(double) );
+  U = (double*)malloc( N*N*sizeof(double) );
+  VT = (double*)malloc( N*N*sizeof(double) );
+
+  if (svd(N,N,A,S,U,VT))
+  {
+    // ERRORFLAG ERRLPCKRNTF "LAPACK run-time failure"
+    AddErr(ERRLPCKRNTF);
+    return;
+  }
+
+  // U \Sigma^+ V^T
+  for (int i=0; i < N; ++i)
+    for (int j=0; j < N; ++j)
+      VT[INDEX(i,j,N)] *= (fabs(S[i]) > tol? 1/S[i] : 0);
+  MMult("N","N",N,N,N,N,U,VT,A);
+
+  free(VT);
+  free(U);
+  free(S);
+}
+
 void lsfit_proj_qr(int M, int N, double* A, double tol, double *RES)
 /*
  * Compute projection operator of the least squares fit using QR
