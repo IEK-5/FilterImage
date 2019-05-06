@@ -135,6 +135,25 @@ int qrQ(int M, int N, int RK, double *A, double *TAU)
   return info;
 }
 
+int svd(int M, int N, double *A, double *S, double *U, double *VT)
+{
+  int m=M, n=N, info, lwork, *iwork;
+  double *work, wkopt;
+  iwork = (int*)malloc( 8*n*sizeof(int) );
+
+  lwork = -1;
+  dgesdd_("S",&m,&n,A,&m,S,U,&m,VT,&n,
+          &wkopt,&lwork,iwork,&info);
+  lwork=(int)wkopt;
+  work = (double*)malloc( lwork*sizeof(double) );
+  dgesdd_("S",&m,&n,A,&m,S,U,&m,VT,&n,
+          work,&lwork,iwork,&info);
+
+  free(work);
+  free(iwork);
+  return info;
+}
+
 void lsfit_proj_qr(int M, int N, double* A, double tol, double *RES)
 /*
  * Compute projection operator of the least squares fit using QR
@@ -213,26 +232,12 @@ void lsfit_proj_svd(int M, int N, double* A, double tol, double *R)
  *
  */
 {
-  int m=M, n=N, lda=M, ldu=M, ldvt=N, info, lwork, *iwork;
-  double wkopt, *work, *S, *U, *VT;
-  // iwork dimension should be at least 8*min(m,n)
-  iwork = (int*)malloc( 8*n*sizeof(int) );
-  S = (double*)malloc( n*sizeof(double) );
-  U = (double*)malloc( ldu*n*sizeof(double) );
-  VT = (double*)malloc( ldvt*n*sizeof(double) );
+  double *S, *U, *VT;
+  S = (double*)malloc( N*sizeof(double) );
+  U = (double*)malloc( M*N*sizeof(double) );
+  VT = (double*)malloc( N*N*sizeof(double) );
 
-  // compute optimal lwork
-  lwork = -1;
-  dgesdd_("S",&m,&n,A,&lda,S,U,&ldu,VT,&ldvt,
-          &wkopt,&lwork,iwork,&info);
-  lwork=(int)wkopt;
-  work = (double*)malloc( lwork*sizeof(double) );
-
-  // compute svd
-  dgesdd_("S",&m,&n,A,&lda,S,U,&ldu,VT,&ldvt,
-          work,&lwork,iwork,&info);
-
-  if (info>0)
+  if (svd(M,N,A,S,U,VT))
   {
     // ERRORFLAG ERRLPCKRNTF "LAPACK run-time failure"
     AddErr(ERRLPCKRNTF);
@@ -241,17 +246,15 @@ void lsfit_proj_svd(int M, int N, double* A, double tol, double *R)
 
   // V^T (U \Sigma^+)^T
   int i,j;
-  for (i=0;i<n;++i)
-    for (j=0;j<ldu;++j)
-      U[INDEX(j,i,ldu)] *= (fabs(S[i]) > tol? 1/S[i] : 0);
-  Transpose(VT,n,n);
-  MMultABT(n,n,ldu,n,VT,U,R);
+  for (i=0;i<N;++i)
+    for (j=0;j<M;++j)
+      U[INDEX(j,i,M)] *= (fabs(S[i]) > tol? 1/S[i] : 0);
+  Transpose(VT,N,N);
+  MMultABT(N,N,M,N,VT,U,R);
 
-  free(work);
   free(VT);
   free(U);
   free(S);
-  free(iwork);
 }
 
 void lsfit_proj_inverse(int M, int N, double *A, double *R)
