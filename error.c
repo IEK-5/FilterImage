@@ -31,7 +31,7 @@ int QueryErr(int ERRFLAG)
 void E_Messages()
 {
 	int i;
-	for (i=1;i<NERR;i++)
+	for (i=0;i<NERR;i++)
 		if (ERRORS[i])
 			fprintf(stderr,"ERROR: %s (%dx)\n",  EMessages[i], ERRORS[i]);
 }
@@ -39,7 +39,7 @@ void E_Messages()
 void ResetErrors()
 {
 	int i;
-	for (i=1;i<NERR;i++)
+	for (i=0;i<NERR;i++)
 		ERRORS[i]=0;
 	ERRORSTATE=0;
 }

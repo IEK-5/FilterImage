@@ -643,7 +643,7 @@ image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, i
 {	
 	filterset F;
 	image R;
-	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
+	F=DerivOperatorSet2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
 	if (ERRORSTATE)
 		return null_image;
 	R=PL_ApplyFilter(I, stepy, stepx, F);
@@ -796,7 +796,7 @@ image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int 
 {	
 	filterset F;
 	image R;
-	F=DerivOperatorSet2D(ny, ny, nx, ny, deriv_m, m, fx, fy);
+	F=DerivOperatorSet2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
 	if (ERRORSTATE)
 		return null_image;
 	R=ApplyFilter(I, stepy, stepx, F);
