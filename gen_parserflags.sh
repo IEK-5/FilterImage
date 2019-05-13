@@ -22,7 +22,7 @@ do
 done
 
 # create the parse flag defines
-awk '{print "void "$4"(char *in);"}' tmpflags | uniq>>$FILE
+awk '{print "void "$4"(char *in);"}' tmpflags | sort | uniq>>$FILE
 
 echo "typedef void (*ParserFun)(char *in);">>$FILE
 echo "typedef struct {">>$FILE

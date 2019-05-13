@@ -9,6 +9,7 @@
 #include "floatimage_io.h"
 #include "filter.h"
 #include "error.h"
+#include "variables.h"
 
 char * GetWord(char *in, char *word)
 /* take string in and allocated string word
@@ -33,6 +34,16 @@ char * GetWord(char *in, char *word)
 		end++;
 	}
 	*out='\0';
+	go=1; /* skip blank chars */
+	while (*end && go)
+	{
+		if (!isblank(*end))
+		{
+			go=0;
+		}
+		else
+			end++;
+	}
 	return end;
 }
 
@@ -98,10 +109,6 @@ void GetOption(char *in, char *opt, char *word)
 }
 
 
-/* global variables */	
-image Iin =  {NULL, 0, 0};
-image Iout = {NULL, 0, 0};
-
 
 /* parse routines
  * for each parse routine add a parseflag:
@@ -116,96 +123,127 @@ image Iout = {NULL, 0, 0};
 // PARSEFLAG load ReadFile
 void ReadFile(char *in)
 {
-	int go=1;
-	while (*in && go)
+	image I;
+	char *name;
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
+	if (!in)
 	{
-		if (!isblank(*in))
-		{
-			go=0;
-		}
-		else
-			in++;
+		// ERRORFLAG ERRPREMEND  "premature end of input"
+		AddErr(ERRPREMEND);
+		free(name);
+		return;
 	}
-	if (Iin.I)
-		FreeImage(&Iin);	
-	Iin=FloatimageRead(in);
+	I=FloatimageRead(in);
+	if (!ERRORSTATE)
+	{
+		printf("Defining image \"%s\"\n", name);
+		AddImage(name, I);
+	}		
 }
 
 // PARSEFLAG save SaveFile
 void SaveFile(char *in)
 {
-	int go=1;
-	if (!Iout.I)
+	image I;
+	char *name;
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
+	if (!in)
 	{
-		// ERRORFLAG ERRNOOIMAGE  "cannot save output image, no output image computed"
-		AddErr(ERRNOOIMAGE);
+		AddErr(ERRPREMEND);
+		free(name);
 		return;
 	}
-	while (*in && go)
+	if (!LookupImage(name, &I))
 	{
-		if (!isblank(*in))
-		{
-			go=0;
-		}
-		else
-			in++;
-	}	
-	FloatimageWrite(in, Iout, 1,0,1);
+		// ERRORFLAG ERRNOOIMAGE  "image not available"
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
+	}
+	free(name);
+	if (!ERRORSTATE)
+		FloatimageWrite(in, I, 1,0,1);
 }
 
 // PARSEFLAG txtsave TXTSaveFile
 void TXTSaveFile(char *in)
 {
-	if (!Iout.I)
+	image I;
+	char *name;
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
+	if (!in)
 	{
-		AddErr(ERRNOOIMAGE);
+		AddErr(ERRPREMEND);
+		free(name);
 		return;
 	}
-	if (in)
+	if (!LookupImage(name, &I))
 	{
-		if (strncmp(in, "-", 2)==0)
-			Floatimage2stdout(Iout);
-		else
-			FloatimageTXTWrite(in, Iout);
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
 	}
+	free(name);
+	if (ERRORSTATE)
+		return;
+	if (strncmp(in, "-", 2)==0)
+		Floatimage2stdout(I);
+	else
+		FloatimageTXTWrite(in, I);
 }
 
+// PARSEFLAG who Who
+void Who(char *in)
+{
+	ListVars();
+}
 // PARSEFLAG ELtoVj ELtoVj
 void ELtoVj(char *in)
 {
-	char *arg;
-	char *temp;
-	if (!Iin.I)
+	image I;
+	char *name;
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
+	if (!LookupImage(name, &I))
 	{
-		// ERRORFLAG ERRNOIIMAGE  "Cannot process input image, no image loaded"
-		AddErr(ERRNOIIMAGE);
+		AddErr(ERRNOOIMAGE);
+		free(name);
 		return;
 	}
-	if (in)
-	{
-		temp=malloc(strlen(in)*sizeof(char));
-		arg=GetWord(in, temp);
-		EL2Vj(Iin, atof(temp)); // convert to junction voltages
-		free(temp);
-	}
+	
+	EL2Vj(I, atof(name)); // convert to junction voltages
+	free(name);
 }
 
+/* todo split in makefilter, makefilterset, and applyfilterset, plain_applyfilterset, fft_applyfilter */
 
 // PARSEFLAG plain_filter PlainFilter
 void PlainFilter(char *in)
 {
-	char *arg;
-	char *opt;
 	char *word;
+	char *name;
 	int Nx, Ny, stepy, stepx, m, dm;
-	double fx, fy;
-	
-	if (!Iin.I)
+	double fx, fy;	
+	image I, Iout;
+	word=malloc(strlen(in)*sizeof(char));
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
+	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
+	if (!in)
 	{
-		AddErr(ERRNOIIMAGE);
+		AddErr(ERRPREMEND);
+		free(word);
 		return;
 	}
-	
+	if (!LookupImage(word, &I))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(word);
+		return;
+	}
 	// Parse options:
 	word=malloc(strlen(in)*sizeof(char));
 	
@@ -225,6 +263,8 @@ void PlainFilter(char *in)
 	m=atoi(word);
 	
 	GetOption(in, "dm", word);
+	if (ERRORSTATE)
+		return;
 	dm=atoi(word);
 	
 	GetOption(in, "fx", word);
@@ -233,26 +273,45 @@ void PlainFilter(char *in)
 	GetOption(in, "fy", word);
 	fy=atof(word);
 	
-	if (Iout.I)
-		FreeImage(&Iout);
-	Iout=PL_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, dm, fx, fy);
+	if (ERRORSTATE)
+	{
+		free(word);
+		return;
+	}
+	Iout=PL_PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy);
+	if (!ERRORSTATE)
+	{
+		printf("Defining image \"%s\"\n", name);
+		AddImage(name, Iout);
+	}
+	free(word);
 }	
 	
 // PARSEFLAG filter Filter
 void Filter(char *in)
 {
-	char *arg;
-	char *opt;
 	char *word;
+	char *name;
 	int Nx, Ny, stepy, stepx, m, dm;
 	double fx, fy;
 	
-	if (!Iin.I)
+	image I, Iout;
+	word=malloc(strlen(in)*sizeof(char));
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
+	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
+	if (!in)
 	{
-		AddErr(ERRNOIIMAGE);
+		AddErr(ERRPREMEND);
+		free(word);
 		return;
 	}
-	
+	if (!LookupImage(word, &I))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(word);
+		return;
+	}
 	// Parse options:
 	word=malloc(strlen(in)*sizeof(char));
 	
@@ -280,29 +339,46 @@ void Filter(char *in)
 	GetOption(in, "fy", word);
 	fy=atof(word);
 	
-	if (Iout.I)
-		FreeImage(&Iout);
-	Iout=PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, dm, fx, fy);
+	if (ERRORSTATE)
+	{
+		free(word);
+		return;
+	}
+	Iout=PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy);
+	if (!ERRORSTATE)
+	{		
+		printf("Defining image \"%s\"\n", name);
+		AddImage(name, Iout);
+	}
+	free(word);
 }	
 
 // PARSEFLAG fft_filter FFT_Filter
 void FFT_Filter(char *in)
 {
-	char *arg;
-	char *opt;
 	char *word;
+	char *name;
 	int Nx, Ny, stepy, stepx, m, dm;
-	double fx, fy;
-	
-	if (!Iin.I)
+	double fx, fy;	
+	image I, Iout;
+	word=malloc(strlen(in)*sizeof(char));
+	name=malloc(strlen(in)*sizeof(char));
+	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
+	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
+	if (!in)
 	{
-		AddErr(ERRNOIIMAGE);
+		AddErr(ERRPREMEND);
+		free(word);
+		return;
+	}
+	if (!LookupImage(word, &I))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(word);
 		return;
 	}
 	
-	// Parse options:
-	word=malloc(strlen(in)*sizeof(char));
-	
+	// Parse options:	
 	GetOption(in, "Nx", word);
 	Nx=atoi(word);	
 	
@@ -327,9 +403,18 @@ void FFT_Filter(char *in)
 	GetOption(in, "fy", word);
 	fy=atof(word);
 	
-	if (Iout.I)
-		FreeImage(&Iout);
-	Iout=FFT_PolynomalFilter(Iin, Ny, Nx, stepy, stepx, m, dm, fx, fy);
+	if (ERRORSTATE)
+	{
+		free(word);
+		return;
+	}
+	Iout=FFT_PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy);
+	if (!ERRORSTATE)
+	{
+		printf("Defining image \"%s\"\n", name);
+		AddImage(name, Iout);
+	}
+	free(word);
 }	
 
 #define MAXLINELEN 4096
@@ -344,6 +429,7 @@ void ParseFile(char *fn)
 		AddErr(ERRPFILEREAD);
 		return;
 	}
+	InitVars();
 	line=malloc(MAXLINELEN*sizeof(char));
     fgets(line, MAXLINELEN-1, f);
 	while(feof(f)==0)
@@ -352,20 +438,14 @@ void ParseFile(char *fn)
 		fgets(line, MAXLINELEN-1, f);
 	}
 	free(line);
-	if (Iout.I)
-		FreeImage(&Iout);
-	if (Iin.I)
-		FreeImage(&Iin);
-	
+	ClearVars();
 }
 
 void ParseCommandline(int argc, char **argv)
 {
 	int i=0;
+	InitVars();
 	for (i=0;i<argc;i++)
 		ParseComm(argv[i]);
-	if (Iout.I)
-		FreeImage(&Iout);
-	if (Iin.I)
-		FreeImage(&Iin);
+	ClearVars();
 }

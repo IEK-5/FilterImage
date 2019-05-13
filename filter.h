@@ -12,6 +12,8 @@ typedef struct filterset {
 	filter *set;
 } filterset;
 void PrintMat(double *A, int N, int M);
+void FreeFilter(filter *F);
+void FreeFilterSet(filterset *F);
 
 // computing & handling filters
 filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy);
