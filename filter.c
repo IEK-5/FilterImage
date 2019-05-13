@@ -18,6 +18,7 @@ image null_image = {NULL, 0, 0};
 filter null_filter = {0, 0, 0, 0, NULL};
 filterset null_filterset = {0, 0, 0, 0, NULL};
 
+
 void Transpose(double *A, int N, int M)
 {
 	double *AA;
@@ -336,7 +337,8 @@ void lsfit_proj_pseudo_inverse(int M, int N, double *A, double *R)
   free(AA);
 }
 
-double *LLS(int nn, int ns, int nw, int ne, int m)
+double FILTER_EPS=1e-7;
+double *LLS(int nn, int ns, int nw, int ne, int m, char method)
 /* 
  * nn: number values to the north
  * ns: number values to the south
@@ -403,11 +405,21 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 		}
 	}
 	a=malloc((N*M)*sizeof(double));
-
-	//lsfit_proj_inverse(M,N,A,a);
-	lsfit_proj_pseudo_inverse(M,N,A,a);
-	//lsfit_proj_qr(N,M,A,1e-7,a);
-	//lsfit_proj_svd(N,M,A,1e-7,a);
+	switch(method)
+	{
+		case 'i': /* inverse */
+			lsfit_proj_inverse(M,N,A,a);
+			break;
+		case 'q':
+			lsfit_proj_qr(N,M,A,FILTER_EPS,a);
+			break;
+		case 's':
+			lsfit_proj_svd(N,M,A,FILTER_EPS,a);
+			break;
+		case 'p': /* pseudo-inverse */
+		default:
+			lsfit_proj_pseudo_inverse(M,N,A,a);
+	}
 
 	free(A);
 	if (ERRORSTATE)
@@ -416,7 +428,7 @@ double *LLS(int nn, int ns, int nw, int ne, int m)
 }
 
 
-filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy)
+filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy, char method)
 /* 
  * nn: number values to the north
  * ns: number values to the south
@@ -435,7 +447,7 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx
 	int N, M;
 	int i;
 
-	a=LLS(nn, ns, nw, ne, m);
+	a=LLS(nn, ns, nw, ne, m, method);
 	if (ERRORSTATE)
 		return null_filter;
 		
@@ -496,6 +508,78 @@ filter PartDeriv2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx
 	free(a);
 	return F;
 }
+void AppendFilter2File(FILE *f, filter F)
+{
+	fwrite(&F.nw, sizeof(int), 1, f);
+	fwrite(&F.ne, sizeof(int), 1, f);
+	fwrite(&F.nn, sizeof(int), 1, f);
+	fwrite(&F.ns, sizeof(int), 1, f);
+	fwrite(F.F, sizeof(double), (F.nn+F.ns+1)*(F.nw+F.ne+1), f);
+}
+filter FetchFilterFromFile(FILE *f)
+{
+	filter F;
+	
+	if (!fread(&F.nw, sizeof(int), 1, f))
+	{
+		// ERRORFLAG ERRPREEOF  "premature end of filter-file"
+		AddErr(ERRPREEOF);
+		return null_filter;
+	}
+	if (!fread(&F.ne, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filter;
+	}
+	if (!fread(&F.nn, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filter;
+	}
+	if (!fread(&F.ns, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filter;
+	}
+	F.F=malloc((F.nn+F.ns+1)*(F.nw+F.ne+1)*sizeof(double));
+	if (fread(F.F, sizeof(double), (F.nn+F.ns+1)*(F.nw+F.ne+1), f)<(F.nn+F.ns+1)*(F.nw+F.ne+1))
+	{
+		AddErr(ERRPREEOF);
+		return null_filter;
+	}
+	return F;	
+}
+
+void SaveFilter(char *fn, filter F)
+{
+
+	FILE *f;
+	
+	if ((f=fopen(fn,"wb"))==NULL)
+	{
+		AddErr(ERROFILEW);
+		return;
+	}
+	AppendFilter2File(f, F);
+	fclose(f);
+}
+
+filter LoadFilter(char *fn)
+{
+
+	FILE *f;
+	filter F;
+	
+	if ((f=fopen(fn,"rb"))==NULL)
+	{
+		// ERRORFLAG ERROFILER  "cannot open file for reading"
+		AddErr(ERROFILER);
+		return null_filter;
+	}
+	F=FetchFilterFromFile(f);
+	fclose(f);
+	return F;
+}
 
 void PrintFilter(filter F)
 // print filter coefficients
@@ -514,7 +598,7 @@ void FreeFilter(filter *F)
 	F->F=NULL;
 }
 
-filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy)
+filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m, double fx, double fy, char method)
 /* 
  * nn: number values to the north
  * ns: number values to the south
@@ -554,7 +638,7 @@ filterset DerivOperatorSet2D(int nn, int ns, int nw, int ne, int deriv_m, int m,
 				w+=j;
 			if (j>0)
 				e-=j;
-			F.set[(nn+i)*M+(nw+j)]=PartDeriv2D(n, s, w, e, deriv_m, m, fx, fy);
+			F.set[(nn+i)*M+(nw+j)]=PartDeriv2D(n, s, w, e, deriv_m, m, fx, fy, method);
 			if (ERRORSTATE)
 				return null_filterset;
 			//if ((n==nn)&&(s==ns)&&(e==ne)&&(w==nw))
@@ -578,6 +662,67 @@ void FreeFilterSet(filterset *F)
 	F->set=NULL;
 }
 
+void SaveFilterSet(char *fn, filterset F)
+{
+
+	FILE *f;
+	int i,j, k=0;
+	
+	if ((f=fopen(fn,"wb"))==NULL)
+	{
+		AddErr(ERROFILEW);
+		return;
+	}
+	fwrite(&F.nw, sizeof(int), 1, f);
+	fwrite(&F.ne, sizeof(int), 1, f);
+	fwrite(&F.nn, sizeof(int), 1, f);
+	fwrite(&F.ns, sizeof(int), 1, f);
+	for (i=-F.nn;i<=F.ns;i++)
+		for (j=-F.nw;j<=F.ne;j++)
+			AppendFilter2File(f, F.set[k++]);
+	fclose(f);
+}
+
+filterset LoadFilterSet(char *fn)
+{
+
+	FILE *f;
+	filterset F;
+	int i,j,k=0;
+	
+	if ((f=fopen(fn,"rb"))==NULL)
+	{
+		AddErr(ERROFILER);
+		return null_filterset;
+	}
+	
+	if (!fread(&F.nw, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filterset;
+	}
+	if (!fread(&F.ne, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filterset;
+	}
+	if (!fread(&F.nn, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filterset;
+	}
+	if (!fread(&F.ns, sizeof(int), 1, f))
+	{
+		AddErr(ERRPREEOF);
+		return null_filterset;
+	}
+	F.set=malloc((F.nn+F.ns+1)*(F.nw+F.ne+1)*sizeof(filter));
+	for (i=-F.nn;i<=F.ns;i++)
+		for (j=-F.nw;j<=F.ne;j++)
+			F.set[k++]=FetchFilterFromFile(f);
+	fclose(f);
+	return F;
+}
 
 void PL_ApplyFilterRange(image I, image R, int row0, int rown, int col0, int colm, int stepy, int stepx, filterset F)
 {
@@ -630,7 +775,7 @@ image PL_ApplyFilter(image I, int stepy, int stepx, filterset F)
 	return R;
 }
 
-image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy, char method)
 /* the plain convolution filter
  * input:
  * I: 		image in column major format 
@@ -643,7 +788,7 @@ image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, i
 {	
 	filterset F;
 	image R;
-	F=DerivOperatorSet2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	F=DerivOperatorSet2D(ny, ny, nx, nx, deriv_m, m, fx, fy, method);
 	if (ERRORSTATE)
 		return null_image;
 	R=PL_ApplyFilter(I, stepy, stepx, F);
@@ -722,7 +867,7 @@ image FFT_ApplyFilter(image I, int stepy, int stepx, filter F)
     return R;
 }
 
-image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy, char method)
 /* same as above only now using an fft. 
  * downside: edge effects as the FFT treats the image as periodic
  * upside: This routine's computation time is independant on the filter size and thus this routine is faster for larger filters
@@ -731,7 +876,7 @@ image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, 
 {	
     image R;
 	filter F;
-	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy, method);
 	if (ERRORSTATE)
 		return null_image;
 	R=FFT_ApplyFilter(I, stepy, stepx, F);
@@ -783,7 +928,7 @@ image ApplyFilter(image I, int stepy, int stepx, filterset F)
 	return R;
 }
 
-image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy, char method)
 /* use FFT for the center part of the image and the plain method for the edge
  * input:
  * I: 		image in column major format 
@@ -796,7 +941,7 @@ image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int 
 {	
 	filterset F;
 	image R;
-	F=DerivOperatorSet2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	F=DerivOperatorSet2D(ny, ny, nx, nx, deriv_m, m, fx, fy, method);
 	if (ERRORSTATE)
 		return null_image;
 	R=ApplyFilter(I, stepy, stepx, F);
@@ -853,11 +998,11 @@ image TestConvolution(image I, image T, int stepy, int stepx, filter F)
 	printf("avg error:%e RMS value %e\n", sqrt(r), sqrt(ref));
 	return R;					
 }
-image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy)
+image CheckFFTvsPlain(image I, int ny, int nx, int stepy, int stepx, int m, int deriv_m, double fx, double fy, char method)
 {	
     image R1, R2;
 	filter F;
-	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy);
+	F=PartDeriv2D(ny, ny, nx, nx, deriv_m, m, fx, fy, method);
 	if (ERRORSTATE)
 		return null_image;
 	R1=FFT_ApplyFilter(I, stepy, stepx, F);

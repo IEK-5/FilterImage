@@ -56,21 +56,21 @@ void ListVars()
 	int i=0;
 	for (i=0;i<Nvar;i++)
 	{
-		printf("Variable \"%s\": ", variables[i].name);
 		switch(variables[i].T)
 		{
 			case FILTERVAR:
-				printf("Filter");
+				printf("Filter     :  ");
 				break;
 			case FILTERSETVAR:
-				printf("Filter Set");
+				printf("Filter Set :  ");
 				break;
 			case IMAGEVAR:
-				printf("Image");
+				printf("Image      :  ");
 				break;
 			default:
 				break;
 		}
+		printf("\"%s\"", variables[i].name);
 		printf("\n");
 	}
 }

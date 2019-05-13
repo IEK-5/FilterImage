@@ -1,9 +1,9 @@
-CFLAGS = -Wall -pedantic -Ofast -flto -fPIC `MagickWand-config --cflags`
-LFLAGS =  -lm -flto -llapack -lopenblas -lfftw3 `MagickWand-config --ldflags --libs`
+CFLAGS = -Wall -pedantic -Og -g -fPIC `MagickWand-config --cflags`
+LFLAGS =  -lm -lreadline -llapack -lopenblas -lfftw3 `MagickWand-config --ldflags --libs`
 CC = gcc
-SRC=floatimage.c floatimage_io.c filter.c error.c main.c parser.c variables.c
-OBJ=floatimage.o floatimage_io.o filter.o main.o error.o parser.o variables.o
-HDR=floatimage.h floatimage_io.h filter.h error.h parser.h variables.h
+SRC=floatimage.c floatimage_io.c filter.c error.c main.c parser.c variables.c readlineshell.c
+OBJ=floatimage.o floatimage_io.o filter.o main.o error.o parser.o variables.o readlineshell.o
+HDR=floatimage.h floatimage_io.h filter.h error.h parser.h variables.h readlineshell.h
 TARGET=FilterImage
 
 $(TARGET): $(OBJ)
@@ -13,12 +13,13 @@ filterimage.oct: filterimage.cc floatimage.o filter.o error.o
 filter.o: floatimage.h filter.h error.h errorflags.h errormessages.h
 floatimage_io.o: floatimage.h filter.h error.h errorflags.h errormessages.h
 floatimage.o: error.h errorflags.h errormessages.h
-main.o: parser.h
+main.o: parser.h variables.h
 error.o: errorflags.h errormessages.h
 variables.o: floatimage.h filter.h error.h
+readlineshell.o: parser.h
 parser.o: parsedefs.h floatimage_io.h floatimage.h filter.h error.h variables.h
-errorflags.h errormessages.h: gen_errorflags.sh filter.c floatimage.c floatimage_io.c error.c parser.c variables.c
-	${SHELL} gen_errorflags.sh filter.c floatimage.c floatimage_io.c error.c parser.c variables.c
+errorflags.h errormessages.h: gen_errorflags.sh $(SRC)
+	${SHELL} gen_errorflags.sh  $(SRC)
 parsedefs.h: gen_parserflags.sh parser.c
 	${SHELL} gen_parserflags.sh parser.c
 clean:
