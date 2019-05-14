@@ -213,6 +213,26 @@ void ImSave(char *in)
 	free(file);
 }
 
+// PARSEFLAG show Show "I=<image-variable>"
+void Show(char *in)
+{
+	image I;
+	char *name;
+	
+	name=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	if (!LookupImage(name, &I))
+	{
+		// ERRORFLAG ERRNOOIMAGE  "image not available"
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
+	}
+	free(name);
+	if (!ERRORSTATE)
+		FloatimageDisplay(I, 1, 0, 1);
+}
+
 // PARSEFLAG txtsave TXTSaveFile "I=<image-variable> file=<filename>"
 void TXTSaveFile(char *in)
 {
