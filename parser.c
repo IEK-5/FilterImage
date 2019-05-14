@@ -19,21 +19,35 @@ char * GetWord(char *in, char *word)
 {
 	char *end=in;
 	char *out=word;
+	int squoted=0, dquoted=0;
 	int go=1;
 	while (*end && go)
 	{
-		if (isspace(*end))
+		if (*end=='\'')
+			squoted=!squoted;
+		if (*end=='\"')
+			dquoted=!dquoted;
+			
+		if (!(squoted||dquoted)&&(isspace(*end)))
 		{
 			go=0;
 		}
 		else 
 		{
-			*out=*end;
-			out++;
+			if ((*end!='\'')||(*end=='\"'))
+			{
+				*out=*end;
+				out++;
+			}
 		}
 		end++;
 	}
 	*out='\0';
+	if (squoted||dquoted)
+	{
+		// ERRORFLAG ERRUNMQUO  "unmatched quotes"
+		AddErr(ERRUNMQUO);
+	}
 	go=1; /* skip blank chars */
 	while (*end && go)
 	{
@@ -63,7 +77,7 @@ ParserFun LookupComm(char *key)
 }
 
 
-void ParseComm(char *in)
+int ParseComm(char *in)
 {
 	char *key;
 	char *arg;
@@ -71,7 +85,7 @@ void ParseComm(char *in)
 	ParserFun fun;
 	/* skip space chars */
 	if (*in=='#')
-		return;
+		return 0;
 	while (*in && go)
 	{
 		if (!isspace(*in))
@@ -82,9 +96,15 @@ void ParseComm(char *in)
 			in++;
 	}
 	if (!(*in))
-		return;
+		return 0;
 	key=malloc((strlen(in)+1)*sizeof(char));
 	arg=GetWord(in, key);
+	if (strncmp(key, "exit", 5)==0)
+	{
+		free(key);
+		return 1;
+	}
+		
 	fun=LookupComm(key);
 	if (fun)
 		fun(arg);
@@ -100,6 +120,7 @@ void ParseComm(char *in)
 		ResetErrors();
 	}
 	free(key);
+	return 0;
 }
 
 int GetOption(char *in, char *opt, char *word)
@@ -123,6 +144,17 @@ int GetOption(char *in, char *opt, char *word)
 	return 1;
 }
 
+int GetArg(char *in, char *opt, char *word)
+{
+	if (!GetOption(in, opt, word))
+	{		
+		// ERRORFLAG ERRMISSINGARG  "Mandatory argument missing"
+		AddErr(ERRMISSINGARG);
+		return 0;
+	}
+	return 1;
+}
+
 
 
 /* parse routines
@@ -134,42 +166,40 @@ int GetOption(char *in, char *opt, char *word)
  * The gen_parseflags will take care of all the definitions in parsedef.h
  */
  
-// PARSEFLAG imread ImRead
-// PARSEFLAG imload ImRead
+// PARSEFLAG imread ImRead "I=<image-variable> file=<filename>"
+// PARSEFLAG imload ImRead "I=<image-variable> file=<filename>"
 void ImRead(char *in)
 {
 	image I;
-	char *name;
+	char *name; 
+	char *file; 
+	
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		// ERRORFLAG ERRPREMEND  "premature end of input"
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
-	I=FloatimageRead(in);
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	if (GetArg(in, "file", file))
+		I=FloatimageRead(file);
 	if (!ERRORSTATE)
 	{
 		printf("Defining image \"%s\"\n", name);
 		AddImage(name, I);
-	}		
+	}	
+	else
+		free(name);
+	free(file);
 }
 
-// PARSEFLAG imsave ImSave
+// PARSEFLAG imsave ImSave "I=<image-variable> file=<filename>"
 void ImSave(char *in)
 {
 	image I;
 	char *name;
+	char *file; 
+	
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	GetArg(in, "file", file);
 	if (!LookupImage(name, &I))
 	{
 		// ERRORFLAG ERRNOOIMAGE  "image not available"
@@ -179,73 +209,22 @@ void ImSave(char *in)
 	}
 	free(name);
 	if (!ERRORSTATE)
-		FloatimageWrite(in, I, 1,0,1);
+		FloatimageWrite(file, I, 1,0,1);
+	free(file);
 }
 
-// PARSEFLAG txtsave TXTSaveFile
+// PARSEFLAG txtsave TXTSaveFile "I=<image-variable> file=<filename>"
 void TXTSaveFile(char *in)
 {
 	image I;
 	char *name;
+	char *file; 
+	
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	GetArg(in, "file", file);
 	if (!LookupImage(name, &I))
-	{
-		AddErr(ERRNOOIMAGE);
-		free(name);
-		return;
-	}
-	free(name);
-	if (ERRORSTATE)
-		return;
-	if (strncmp(in, "-", 2)==0)
-		Floatimage2stdout(I);
-	else
-		FloatimageTXTWrite(in, I);
-}
-// PARSEFLAG fsetread FilterSetRead
-// PARSEFLAG fsetload FilterSetRead
-void FilterSetRead(char *in)
-{
-	filterset F;
-	char *name;
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		// ERRORFLAG ERRPREMEND  "premature end of input"
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
-	F=LoadFilterSet(in);
-	if (!ERRORSTATE)
-	{
-		printf("Defining filterset \"%s\"\n", name);
-		AddFilterSet(name, F);
-	}		
-}
-
-// PARSEFLAG fsetsave FilterSetSave
-void FilterSetSave(char *in)
-{
-	filterset F;
-	char *name;
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
-	if (!LookupFilterSet(name, &F))
 	{
 		// ERRORFLAG ERRNOOIMAGE  "image not available"
 		AddErr(ERRNOOIMAGE);
@@ -254,45 +233,100 @@ void FilterSetSave(char *in)
 	}
 	free(name);
 	if (!ERRORSTATE)
-		SaveFilterSet(in, F);
+	{
+		if (strncmp(file, "-", 2)==0)
+			Floatimage2stdout(I);
+		else
+			FloatimageTXTWrite(file, I);
+	}
+	free(file);
+}
+// PARSEFLAG fsetread FilterSetRead "F=<filter-set-variable> file=<filename>"
+// PARSEFLAG fsetload FilterSetRead "F=<filter-set-variable> file=<filename>"
+void FilterSetRead(char *in)
+{
+	filterset F;
+	char *name;
+	char *file; 
+	
+	name=malloc((strlen(in)+1)*sizeof(char));
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "F", name);
+	GetArg(in, "file", file);
+	
+	if (!ERRORSTATE)
+		F=LoadFilterSet(file);
+	if (!ERRORSTATE)
+	{
+		printf("Defining filterset \"%s\"\n", name);
+		AddFilterSet(name, F);
+	}
+	else
+		free(name);
+	free(file);
 }
 
-// PARSEFLAG fread FilterRead
-// PARSEFLAG fload FilterRead
+// PARSEFLAG fsetsave FilterSetSave "F=<filter-set-variable> file=<filename>"
+void FilterSetSave(char *in)
+{
+	filterset F;
+	char *name;
+	char *file; 
+	
+	name=malloc((strlen(in)+1)*sizeof(char));
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "F", name);
+	GetArg(in, "file", file);
+	if (!LookupFilterSet(name, &F))
+	{
+		// ERRORFLAG ERRNOFSET  "filter set not available"
+		AddErr(ERRNOFSET);
+		free(name);
+		return;
+	}
+	free(name);
+	if (!ERRORSTATE)
+		SaveFilterSet(file, F);
+	free(file);
+}
+
+// PARSEFLAG fread FilterRead "F=<filter-variable> file=<filename>"
+// PARSEFLAG fload FilterRead "F=<filter-variable> file=<filename>"
 void FilterRead(char *in)
 {
 	filter F;
 	char *name;
+	char *file; 
+	
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		// ERRORFLAG ERRPREMEND  "premature end of input"
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
-	F=LoadFilter(in);
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "F", name);
+	GetArg(in, "file", file);
+	
+	if (!ERRORSTATE)
+		F=LoadFilter(file);
 	if (!ERRORSTATE)
 	{
 		printf("Defining filter \"%s\"\n", name);
 		AddFilter(name, F);
-	}		
+	}	
+	else
+		free(name);
+	free(file);
 }
 
-// PARSEFLAG fsave FilterSave
+// PARSEFLAG fsave FilterSave "F=<filter-variable> file=<filename>"
 void FilterSave(char *in)
 {
 	filter F;
 	char *name;
+	char *file; 
+	
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(name);
-		return;
-	}
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "F", name);
+	GetArg(in, "file", file);
+	
 	if (!LookupFilter(name, &F))
 	{
 		// ERRORFLAG ERRNOOIMAGE  "image not available"
@@ -302,9 +336,10 @@ void FilterSave(char *in)
 	}
 	free(name);
 	if (!ERRORSTATE)
-		SaveFilter(in, F);
+		SaveFilter(file, F);
+	free(file);
 }
-// PARSEFLAG makefilter MakeFilter
+// PARSEFLAG makefilter MakeFilter "F=<filter-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
 void MakeFilter(char *in)
 {
 	filter F;	
@@ -315,13 +350,7 @@ void MakeFilter(char *in)
 	double fx=1, fy=1;
 	word=malloc((strlen(in)+1)*sizeof(char));
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the first word of in, will be the name of the input image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
+	GetArg(in, "F", name);
 	
 	if (GetOption(in, "nn", word))
 		nn=atoi(word);	
@@ -366,7 +395,7 @@ void MakeFilter(char *in)
 	free(word);
 }
 
-// PARSEFLAG makefilterset MakeFilterSet
+// PARSEFLAG makefilterset MakeFilterSet "F=<filter-set-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
 void MakeFilterSet(char *in)
 {
 	filterset F;	
@@ -377,13 +406,7 @@ void MakeFilterSet(char *in)
 	double fx=1, fy=1;
 	word=malloc((strlen(in)+1)*sizeof(char));
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the first word of in, will be the name of the input image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
+	GetArg(in, "F", name);
 	
 	if (GetOption(in, "nn", word))
 		nn=atoi(word);	
@@ -429,36 +452,41 @@ void MakeFilterSet(char *in)
 }
 
 
-// PARSEFLAG plain_applyfilterset PlainApplyFilterSet
+// PARSEFLAG plain_applyfilterset PlainApplyFilterSet "Iin=<input-image-variable> Iout=<output-image-variable> F=<filter-set-variable> stepx=<int> stepy=<int>"
 void PlainApplyFilterSet(char *in)
 {
 	char *word;
-	char *name;
 	int stepy=1, stepx=1;
 	image I, Iout;
 	filterset F;
+	char *iname, *oname, *fname;
 	
 	word=malloc((strlen(in)+1)*sizeof(char));
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
-	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
-	if (!LookupImage(word, &I))
+	iname=malloc((strlen(in)+1)*sizeof(char));
+	oname=malloc((strlen(in)+1)*sizeof(char));
+	fname=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "Iin", iname);
+	GetArg(in, "Iout", oname);
+	GetArg(in, "F", fname);
+	
+	if (!LookupImage(iname, &I))
 	{
 		AddErr(ERRNOOIMAGE);
+		free(iname);
+		free(oname);
+		free(fname);
 		free(word);
 		return;
 	}
-	in=GetWord(in, word); /* fetch the filter */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
-	if (!LookupFilterSet(word, &F))
+	
+	if (!LookupFilterSet(fname, &F))
 	{
 		// ERRORFLAG ERRNOFILTERSET  "filterset not available"
 		AddErr(ERRNOFILTERSET);
+		free(iname);
+		free(oname);
+		free(fname);
 		free(word);
 		return;
 	}
@@ -472,49 +500,61 @@ void PlainApplyFilterSet(char *in)
 	
 	if (ERRORSTATE)
 	{
+		free(iname);
+		free(oname);
+		free(fname);
 		free(word);
-		free(name);
 		return;
 	}
 	Iout=PL_ApplyFilter(I, stepy, stepx,  F);
 	if (!ERRORSTATE)
 	{
-		printf("Defining image \"%s\"\n", name);
-		AddImage(name, Iout);
+		printf("Defining image \"%s\"\n", oname);
+		AddImage(oname, Iout);
 	}
+	else
+		free(oname);
+	free(iname);
+	free(fname);
 	free(word);
 }	
 
-// PARSEFLAG applyfilterset ApplyFilterSet
+// PARSEFLAG applyfilterset ApplyFilterSet "Iin=<input-image-variable> Iout=<output-image-variable> F=<filter-set-variable> stepx=<int> stepy=<int>"
 void ApplyFilterSet(char *in)
 {
 	char *word;
-	char *name;
 	int stepy=1, stepx=1;
 	image I, Iout;
 	filterset F;
 	
+	char *iname, *oname, *fname;
+	
 	word=malloc((strlen(in)+1)*sizeof(char));
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
-	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
-	if (!LookupImage(word, &I))
+	iname=malloc((strlen(in)+1)*sizeof(char));
+	oname=malloc((strlen(in)+1)*sizeof(char));
+	fname=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "Iin", iname);
+	GetArg(in, "Iout", oname);
+	GetArg(in, "F", fname);
+	
+	if (!LookupImage(iname, &I))
 	{
 		AddErr(ERRNOOIMAGE);
+		free(iname);
+		free(oname);
+		free(fname);
 		free(word);
 		return;
 	}
-	in=GetWord(in, word); /* fetch the filter */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
-	if (!LookupFilterSet(word, &F))
+	
+	if (!LookupFilterSet(fname, &F))
 	{
 		// ERRORFLAG ERRNOFILTERSET  "filterset not available"
 		AddErr(ERRNOFILTERSET);
+		free(iname);
+		free(oname);
+		free(fname);
 		free(word);
 		return;
 	}
@@ -528,63 +568,134 @@ void ApplyFilterSet(char *in)
 	
 	if (ERRORSTATE)
 	{
+		free(iname);
+		free(oname);
+		free(fname);
 		free(word);
-		free(name);
 		return;
 	}
 	Iout=ApplyFilter(I, stepy, stepx,  F);
 	if (!ERRORSTATE)
 	{
-		printf("Defining image \"%s\"\n", name);
-		AddImage(name, Iout);
+		printf("Defining image \"%s\"\n", oname);
+		AddImage(oname, Iout);
 	}
+	else
+		free(oname);
+	free(iname);
+	free(fname);
 	free(word);
 }	
-// PARSEFLAG who Who
+
+// PARSEFLAG fft_applyfilter FFTApplyFilter "Iin=<input-image-variable> Iout=<output-image-variable> F=<filter-variable> stepx=<int> stepy=<int>"
+void FFTApplyFilter(char *in)
+{
+	char *word;
+	int stepy=1, stepx=1;
+	image I, Iout;
+	filter F;
+	
+	char *iname, *oname, *fname;
+	
+	word=malloc((strlen(in)+1)*sizeof(char));
+	iname=malloc((strlen(in)+1)*sizeof(char));
+	oname=malloc((strlen(in)+1)*sizeof(char));
+	fname=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "Iin", iname);
+	GetArg(in, "Iout", oname);
+	GetArg(in, "F", fname);
+	
+	if (!LookupImage(iname, &I))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(iname);
+		free(oname);
+		free(fname);
+		free(word);
+		return;
+	}
+	
+	if (!LookupFilter(fname, &F))
+	{
+		// ERRORFLAG ERRNOFILTERSET  "filterset not available"
+		AddErr(ERRNOFILTERSET);
+		free(iname);
+		free(oname);
+		free(fname);
+		free(word);
+		return;
+	}
+	// Parse options:
+	
+	if (GetOption(in, "stepx", word))
+		stepx=atoi(word);
+	
+	if (GetOption(in, "stepy", word))
+		stepy=atoi(word);
+	
+	if (ERRORSTATE)
+	{
+		free(iname);
+		free(oname);
+		free(fname);
+		free(word);
+		return;
+	}
+	Iout=FFT_ApplyFilter(I, stepy, stepx,  F);
+	if (!ERRORSTATE)
+	{
+		printf("Defining image \"%s\"\n", oname);
+		AddImage(oname, Iout);
+	}
+	else
+		free(oname);
+	free(iname);
+	free(fname);
+	free(word);
+}	
+
+// PARSEFLAG who Who "who"
 void Who(char *in)
 {
 	ListVars();
 }
-// PARSEFLAG ELtoVj ELtoVj
+// PARSEFLAG ELtoVj ELtoVj "ELtoVj I=<image-variable> T=<float>"
 void ELtoVj(char *in)
 {
 	image I;
 	char *name;
 	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, name); /* fetch the firt word of in, will be the name of the image */
+	GetArg(in, "I", name);
 	if (!LookupImage(name, &I))
 	{
 		AddErr(ERRNOOIMAGE);
 		free(name);
 		return;
 	}
-	
-	EL2Vj(I, atof(name)); // convert to junction voltages
+	GetArg(in, "T", name);
+	if (!ERRORSTATE)	
+		EL2Vj(I, atof(name)); // convert to junction voltages
 	free(name);
 }
 
-/* todo split in makefilter, makefilterset, and applyfilterset, plain_applyfilterset, fft_applyfilter */
 
-// PARSEFLAG plain_filter PlainFilter
+// PARSEFLAG plain_filter PlainFilter "Iin=<input-image-variable> Iout=<output-image-variable> Nx=<int> Ny=<int> stepx=<int> stepy=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
 void PlainFilter(char *in)
 {
 	char *word;
-	char *name;
 	int Nx=3, Ny=3, stepy=1, stepx=1, m=2, dm=0;
 	double fx=1, fy=1;
 	char method='p';
 	image I, Iout;
+	char *iname, *oname;
 	word=malloc((strlen(in)+1)*sizeof(char));
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
-	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
-	if (!LookupImage(word, &I))
+	iname=malloc((strlen(in)+1)*sizeof(char));
+	oname=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "Iin", iname);
+	GetArg(in, "Iout", oname);
+	if (!LookupImage(iname, &I))
 	{
 		AddErr(ERRNOOIMAGE);
 		free(word);
@@ -621,39 +732,38 @@ void PlainFilter(char *in)
 	if (ERRORSTATE)
 	{
 		free(word);
-		free(name);
+		free(iname);
+		free(oname);
 		return;
 	}
 	Iout=PL_PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy,method);
 	if (!ERRORSTATE)
 	{
-		printf("Defining image \"%s\"\n", name);
-		AddImage(name, Iout);
+		printf("Defining image \"%s\"\n", oname);
+		AddImage(oname, Iout);
 	}
+	else
+		free(oname);
+	free(iname);
 	free(word);
 }	
 	
-// PARSEFLAG filter Filter
+// PARSEFLAG filter Filter "Iin=<input-image-variable> Iout=<output-image-variable> Nx=<int> Ny=<int> stepx=<int> stepy=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
 void Filter(char *in)
 {
 	char *word;
-	char *name;
 	int Nx=3, Ny=3, stepy=1, stepx=1, m=2, dm=0;
 	double fx=1, fy=1;
-	char method='p';
-	
+	char method='p';	
 	image I, Iout;
+	char *iname, *oname;
 	word=malloc((strlen(in)+1)*sizeof(char));
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
-	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
-	if (!LookupImage(word, &I))
+	iname=malloc((strlen(in)+1)*sizeof(char));
+	oname=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "Iin", iname);
+	GetArg(in, "Iout", oname);
+	if (!LookupImage(iname, &I))
 	{
 		AddErr(ERRNOOIMAGE);
 		free(word);
@@ -690,39 +800,38 @@ void Filter(char *in)
 	if (ERRORSTATE)
 	{
 		free(word);
-		free(name);
+		free(iname);
+		free(oname);
 		return;
-	}
+	}	
 	Iout=PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy,method);
 	if (!ERRORSTATE)
 	{		
-		printf("Defining image \"%s\"\n", name);
-		AddImage(name, Iout);
+		printf("Defining image \"%s\"\n", oname);
+		AddImage(oname, Iout);
 	}
+	else
+		free(oname);
+	free(iname);
 	free(word);
 }	
 
-// PARSEFLAG fft_filter FFT_Filter
+// PARSEFLAG fft_filter FFT_Filter "Iin=<input-image-variable> Iout=<output-image-variable> Nx=<int> Ny=<int> stepx=<int> stepy=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
 void FFT_Filter(char *in)
 {
 	char *word;
-	char *name;
 	int Nx=3, Ny=3, stepy=1, stepx=1, m=2, dm=0;
 	double fx=1, fy=1;
-	char method='p';
-	
+	char method='p';	
 	image I, Iout;
+	char *iname, *oname;
 	word=malloc((strlen(in)+1)*sizeof(char));
-	name=malloc((strlen(in)+1)*sizeof(char));
-	in=GetWord(in, word); /* fetch the first word of in, will be the name of the input image */
-	in=GetWord(in, name); /* fetch the second word of in, will be the name of the output image */
-	if (!in)
-	{
-		AddErr(ERRPREMEND);
-		free(word);
-		return;
-	}
-	if (!LookupImage(word, &I))
+	iname=malloc((strlen(in)+1)*sizeof(char));
+	oname=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "Iin", iname);
+	GetArg(in, "Iout", oname);
+	if (!LookupImage(iname, &I))
 	{
 		AddErr(ERRNOOIMAGE);
 		free(word);
@@ -760,16 +869,66 @@ void FFT_Filter(char *in)
 	if (ERRORSTATE)
 	{
 		free(word);
-		free(name);
+		free(iname);
+		free(oname);
 		return;
-	}
+	}	
 	Iout=FFT_PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy,method);
 	if (!ERRORSTATE)
+	{		
+		printf("Defining image \"%s\"\n", oname);
+		AddImage(oname, Iout);
+	}
+	else
+		free(oname);
+	free(iname);
+	free(word);
+}
+
+void SplitWords(char *in, char *ident)
+{
+	char *word;
+	word=malloc((strlen(in)+1)*sizeof(char));
+	while(*in)
 	{
-		printf("Defining image \"%s\"\n", name);
-		AddImage(name, Iout);
+		in=GetWord(in, word);
+		printf("%s%s\n", ident, word);
 	}
 	free(word);
-}	
+}
+
+// PARSEFLAG help Help "[-l/command]"
+void Help(char *in)
+{
+	int i=0;
+	int lk;
+	lk=strlen(in);
+	if ((strncmp(in,"-l", 3)==0)||(!*in))
+	{
+		while(Usage[i])
+		{
+			printf("Command %s:\n",KeyTable[i].key);
+			SplitWords(Usage[i], "\t");
+			printf("\n");
+			i++;
+		}
+		return;
+	}
+			
+	while (KeyTable[i].key)
+	{
+		if (strlen(KeyTable[i].key)==lk)
+			if (strncmp(KeyTable[i].key, in, lk)==0)
+			{
+				printf("Command %s:\n",KeyTable[i].key);
+				SplitWords(Usage[i], "\t");
+				printf("\n");
+				return;
+			}
+		i++;
+	}
+	printf("Command %s not known\n",in);
+}
+
 
 

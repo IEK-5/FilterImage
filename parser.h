@@ -1,2 +1,2 @@
 
-void ParseComm(char *in);
+int ParseComm(char *in);

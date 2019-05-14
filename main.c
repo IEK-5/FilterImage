@@ -35,7 +35,8 @@ void ParseFile(char *fn)
 	while(feof(f)==0)
 	{
 		StripEndline(line);
-		ParseComm(line);
+		if (ParseComm(line))
+			break;
 		fgets(line, MAXLINELEN-1, f);
 	}
 	free(line);
@@ -66,7 +67,8 @@ int main(int argc, char **argv)
 		}
 		else
 		
-		ParseComm(argv[i]);
+		if (ParseComm(argv[i]))
+			break;
 	}
 	ClearVars();
 }

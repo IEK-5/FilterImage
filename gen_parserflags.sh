@@ -36,5 +36,10 @@ echo "	{NULL, NULL}">>$FILE
 echo "};">>$FILE
 
 
+echo "char *Usage[] = {"  >>  $FILE
+egrep -o '// PARSEFLAG.*' tmpflags|egrep -o '\".*\"' |awk '{print "	"$0","}' >>  $FILE
+echo "	NULL"  >>  $FILE
+echo "};"   >>  $FILE
+
 
 rm tmpflags
