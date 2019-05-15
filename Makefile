@@ -16,11 +16,11 @@ floatimage.o: error.h errorflags.h errormessages.h
 main.o: parser.h variables.h
 error.o: errorflags.h errormessages.h
 variables.o: floatimage.h filter.h error.h
-readlineshell.o: parser.h
-parser.o: parsedefs.h floatimage_io.h floatimage.h filter.h error.h variables.h
+readlineshell.o: parser.h parsedef.h
+parser.o: parsedef.h floatimage_io.h floatimage.h filter.h error.h variables.h
 errorflags.h errormessages.h: gen_errorflags.sh $(SRC)
 	${SHELL} gen_errorflags.sh  $(SRC)
-parsedefs.h: gen_parserflags.sh parser.c
+parsedef.h: gen_parserflags.sh parser.c
 	${SHELL} gen_parserflags.sh parser.c
 clean:
 	rm -f *.o $(TARGET) errorflags.h errormessages.h parserdef.h

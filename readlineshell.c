@@ -36,6 +36,15 @@ static void sighandler (int sig)
 	sigwinch_received = 1;
 }
 
+
+char ** keyword_completion(const char *text, int start, int end)
+{
+    rl_attempted_completion_over = 1;
+    return rl_completion_matches(text, keyword_generator);
+}
+
+
+
 /* Callback function called for each line when accept-line executed, EOF
    seen, or EOF character read.  This sets a flag and returns; it could
    also call exit(3). */
@@ -68,6 +77,7 @@ void shell()
 {
 	fd_set fds;
 	int r;
+    rl_attempted_completion_function = keyword_completion;
 
 	/* Set the default locale values according to environment variables. */
 	setlocale (LC_ALL, "");

@@ -359,15 +359,106 @@ void FilterSave(char *in)
 		SaveFilter(file, F);
 	free(file);
 }
+
+void dmStringParser(char *dmstr, int **dmx, int **dmy, double **f, int *N)
+{
+	char *p, *q, *r;
+	int j=1;
+	
+	/* string has the form <f1>x<n1>y<m1>+<f2>*x<n2>y<m2>+... */
+	p=dmstr;
+	while (*p)
+	{
+		if (*p=='+')
+			j++;
+		p++;
+	}
+	(*N)=0;
+	(*dmx)=malloc(j*sizeof(int));
+	(*dmy)=malloc(j*sizeof(int));
+	(*f)=malloc(j*sizeof(double));
+	
+	p=dmstr;
+	j=0;
+	while (*p)
+	{
+		q=p;
+		r=p;
+		while (*q)
+		{
+			if (*q=='x')
+			{
+				*q='\0'; /* r points to a string <f>*/
+				(*f)[j]=atof(r);
+				q++;
+				break;
+			}
+			q++;
+		}
+		if (!*q)
+		{
+			// ERRORFLAG ERRDERIVSTRINC  "incomplete filter spec"
+			AddErr(ERRDERIVSTRINC);
+			free(*dmx);
+			free(*dmy);
+			free(*f);
+			*dmx=NULL;
+			*dmy=NULL;
+			*f=NULL;
+			return;
+		}
+		r=q;
+		while (*q)
+		{
+			if (*q=='y')
+			{
+				*q='\0'; /* r points to a string <n>*/
+				(*dmx)[j]=atoi(r);
+				q++;
+				break;
+			}
+			q++;
+		}
+		if (!*q)
+		{
+			AddErr(ERRDERIVSTRINC);
+			free(*dmx);
+			free(*dmy);
+			free(*f);
+			*dmx=NULL;
+			*dmy=NULL;
+			*f=NULL;
+			return;
+		}
+		r=q;
+		while (*q)
+		{
+			if (*q=='+')
+			{
+				*q='\0'; /* r points to a string <m>*/
+				(*dmy)[j]=atoi(r);
+				q++;
+				break;
+			}
+			q++;
+		}
+		if (!*q)
+			(*dmy)[j]=atoi(r);
+		p=q;
+		j++;
+		(*N)++;
+	}
+}
 // PARSEFLAG makefilter MakeFilter "F=<filter-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
 void MakeFilter(char *in)
 {
 	filter F;	
 	char *word;
 	char *name;
-	int nn=3, ns=3, nw=3, ne=3, dm=0, m=2;
+	int nn=3, ns=3, nw=3, ne=3, m=2;
 	char method='p';
-	double fx=1, fy=1;
+	int *dmx=NULL, *dmy=NULL, N;
+	double *f=NULL;
 	word=malloc((strlen(in)+1)*sizeof(char));
 	name=malloc((strlen(in)+1)*sizeof(char));
 	GetArg(in, "F", name);
@@ -386,19 +477,25 @@ void MakeFilter(char *in)
 	
 	if (GetOption(in, "m", word))
 		m=atoi(word);
-	
-	if (GetOption(in, "dm", word))
-		dm=atoi(word);
-	
-	if (GetOption(in, "fx", word))
-		fx=atof(word);
-	
-	if (GetOption(in, "fy", word))
-		fy=atof(word);
 		
 	if (GetOption(in, "method", word))
 		method=word[0];	
 	
+	if (GetOption(in, "dm", word))
+		dmStringParser(word, &dmx, &dmy, &f, &N);
+	
+	if (ERRORSTATE)
+	{
+		if (dmx)
+			free(dmx);
+		if (dmy)
+			free(dmy);
+		if (f)
+			free(f);
+		free(word);
+		free(name);
+		return;
+	}
 	
 	if (ERRORSTATE)
 	{
@@ -406,24 +503,32 @@ void MakeFilter(char *in)
 		free(name);
 		return;
 	}
-	F=PartDeriv2D(nn, ns, nw, ne, dm, m, fx, fy, method);
+	F=PartDeriv2DSum(nn, ns, nw, ne, m, dmx, dmy, f, N, method);
 	if (!ERRORSTATE)
 	{
 		printf("Defining filter \"%s\"\n", name);
 		AddFilter(name, F); /* do not free name! */
 	}
 	free(word);
+	if (dmx)
+		free(dmx);
+	if (dmy)
+		free(dmy);
+	if (f)
+		free(f);
 }
 
-// PARSEFLAG makefilterset MakeFilterSet "F=<filter-set-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
+
+// PARSEFLAG makefilterset MakeFilterSet "F=<filter-set-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<string> method=<char>"
 void MakeFilterSet(char *in)
 {
 	filterset F;	
 	char *word;
 	char *name;
-	int nn=3, ns=3, nw=3, ne=3, dm=0, m=2;
+	int nn=3, ns=3, nw=3, ne=3, m=2;
 	char method='p';
-	double fx=1, fy=1;
+	int *dmx=NULL, *dmy=NULL, N;
+	double *f=NULL;
 	word=malloc((strlen(in)+1)*sizeof(char));
 	name=malloc((strlen(in)+1)*sizeof(char));
 	GetArg(in, "F", name);
@@ -443,32 +548,37 @@ void MakeFilterSet(char *in)
 	if (GetOption(in, "m", word))
 		m=atoi(word);
 	
-	if (GetOption(in, "dm", word))
-		dm=atoi(word);
-	
-	if (GetOption(in, "fx", word))
-		fx=atof(word);
-	
-	if (GetOption(in, "fy", word))
-		fy=atof(word);
-		
 	if (GetOption(in, "method", word))
 		method=word[0];	
 	
+	if (GetOption(in, "dm", word))
+		dmStringParser(word, &dmx, &dmy, &f, &N);
 	
 	if (ERRORSTATE)
 	{
+		if (dmx)
+			free(dmx);
+		if (dmy)
+			free(dmy);
+		if (f)
+			free(f);
 		free(word);
 		free(name);
 		return;
 	}
-	F=DerivOperatorSet2D(nn, ns, nw, ne, dm, m, fx, fy,method);
+	F=DerivOperatorSet2D(nn, ns, nw, ne, m, dmx, dmy, f, N,method);
 	if (!ERRORSTATE)
 	{
 		printf("Defining filter set \"%s\"\n", name);
 		AddFilterSet(name, F); /* do not free name! */
 	}
 	free(word);
+	if (dmx)
+		free(dmx);
+	if (dmy)
+		free(dmy);
+	if (f)
+		free(f);
 }
 
 
@@ -699,212 +809,6 @@ void ELtoVj(char *in)
 	free(name);
 }
 
-
-// PARSEFLAG plain_filter PlainFilter "Iin=<input-image-variable> Iout=<output-image-variable> Nx=<int> Ny=<int> stepx=<int> stepy=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
-void PlainFilter(char *in)
-{
-	char *word;
-	int Nx=3, Ny=3, stepy=1, stepx=1, m=2, dm=0;
-	double fx=1, fy=1;
-	char method='p';
-	image I, Iout;
-	char *iname, *oname;
-	word=malloc((strlen(in)+1)*sizeof(char));
-	iname=malloc((strlen(in)+1)*sizeof(char));
-	oname=malloc((strlen(in)+1)*sizeof(char));
-	
-	GetArg(in, "Iin", iname);
-	GetArg(in, "Iout", oname);
-	if (!LookupImage(iname, &I))
-	{
-		AddErr(ERRNOOIMAGE);
-		free(word);
-		return;
-	}
-	// Parse options:
-	
-	if (GetOption(in, "Nx", word))
-		Nx=atoi(word);	
-	
-	if (GetOption(in, "Ny", word))
-		Ny=atoi(word);
-	
-	if (GetOption(in, "stepx", word))
-		stepx=atoi(word);
-	
-	if (GetOption(in, "stepy", word))
-		stepy=atoi(word);
-	
-	if (GetOption(in, "m", word))
-		m=atoi(word);
-	
-	if (GetOption(in, "dm", word))
-		dm=atoi(word);
-	
-	if (GetOption(in, "fx", word))
-		fx=atof(word);
-	
-	if (GetOption(in, "fy", word))
-		fy=atof(word);
-	
-	if (GetOption(in, "method", word))
-		method=word[0];	
-	if (ERRORSTATE)
-	{
-		free(word);
-		free(iname);
-		free(oname);
-		return;
-	}
-	Iout=PL_PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy,method);
-	if (!ERRORSTATE)
-	{
-		printf("Defining image \"%s\"\n", oname);
-		AddImage(oname, Iout);
-	}
-	else
-		free(oname);
-	free(iname);
-	free(word);
-}	
-	
-// PARSEFLAG filter Filter "Iin=<input-image-variable> Iout=<output-image-variable> Nx=<int> Ny=<int> stepx=<int> stepy=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
-void Filter(char *in)
-{
-	char *word;
-	int Nx=3, Ny=3, stepy=1, stepx=1, m=2, dm=0;
-	double fx=1, fy=1;
-	char method='p';	
-	image I, Iout;
-	char *iname, *oname;
-	word=malloc((strlen(in)+1)*sizeof(char));
-	iname=malloc((strlen(in)+1)*sizeof(char));
-	oname=malloc((strlen(in)+1)*sizeof(char));
-	
-	GetArg(in, "Iin", iname);
-	GetArg(in, "Iout", oname);
-	if (!LookupImage(iname, &I))
-	{
-		AddErr(ERRNOOIMAGE);
-		free(word);
-		return;
-	}
-	// Parse options:
-	
-	if (GetOption(in, "Nx", word))
-		Nx=atoi(word);	
-	
-	if (GetOption(in, "Ny", word))
-		Ny=atoi(word);
-	
-	if (GetOption(in, "stepx", word))
-		stepx=atoi(word);
-	
-	if (GetOption(in, "stepy", word))
-		stepy=atoi(word);
-	
-	if (GetOption(in, "m", word))
-		m=atoi(word);
-	
-	if (GetOption(in, "dm", word))
-		dm=atoi(word);
-	
-	if (GetOption(in, "fx", word))
-		fx=atof(word);
-	
-	if (GetOption(in, "fy", word))
-		fy=atof(word);
-	
-	if (GetOption(in, "method", word))
-		method=word[0];	
-	if (ERRORSTATE)
-	{
-		free(word);
-		free(iname);
-		free(oname);
-		return;
-	}	
-	Iout=PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy,method);
-	if (!ERRORSTATE)
-	{		
-		printf("Defining image \"%s\"\n", oname);
-		AddImage(oname, Iout);
-	}
-	else
-		free(oname);
-	free(iname);
-	free(word);
-}	
-
-// PARSEFLAG fft_filter FFT_Filter "Iin=<input-image-variable> Iout=<output-image-variable> Nx=<int> Ny=<int> stepx=<int> stepy=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
-void FFT_Filter(char *in)
-{
-	char *word;
-	int Nx=3, Ny=3, stepy=1, stepx=1, m=2, dm=0;
-	double fx=1, fy=1;
-	char method='p';	
-	image I, Iout;
-	char *iname, *oname;
-	word=malloc((strlen(in)+1)*sizeof(char));
-	iname=malloc((strlen(in)+1)*sizeof(char));
-	oname=malloc((strlen(in)+1)*sizeof(char));
-	
-	GetArg(in, "Iin", iname);
-	GetArg(in, "Iout", oname);
-	if (!LookupImage(iname, &I))
-	{
-		AddErr(ERRNOOIMAGE);
-		free(word);
-		return;
-	}
-	
-	// Parse options:	
-	if (GetOption(in, "Nx", word))
-		Nx=atoi(word);	
-	
-	if (GetOption(in, "Ny", word))
-		Ny=atoi(word);
-	
-	if (GetOption(in, "stepx", word))
-		stepx=atoi(word);
-	
-	if (GetOption(in, "stepy", word))
-		stepy=atoi(word);
-	
-	if (GetOption(in, "m", word))
-		m=atoi(word);
-	
-	if (GetOption(in, "dm", word))
-		dm=atoi(word);
-	
-	if (GetOption(in, "fx", word))
-		fx=atof(word);
-	
-	if (GetOption(in, "fy", word))
-		fy=atof(word);
-		
-	if (GetOption(in, "method", word))
-		method=word[0];	
-	
-	if (ERRORSTATE)
-	{
-		free(word);
-		free(iname);
-		free(oname);
-		return;
-	}	
-	Iout=FFT_PolynomalFilter(I, Ny, Nx, stepy, stepx, m, dm, fx, fy,method);
-	if (!ERRORSTATE)
-	{		
-		printf("Defining image \"%s\"\n", oname);
-		AddImage(oname, Iout);
-	}
-	else
-		free(oname);
-	free(iname);
-	free(word);
-}
-
 void SplitWords(char *in, char *ident)
 {
 	char *word;
@@ -916,7 +820,6 @@ void SplitWords(char *in, char *ident)
 	}
 	free(word);
 }
-
 // PARSEFLAG help Help "[-l/command]"
 void Help(char *in)
 {
@@ -950,5 +853,24 @@ void Help(char *in)
 	printf("Command %s not known\n",in);
 }
 
+
+char * keyword_generator(const char *text, int state)
+{
+    static int list_index, len;
+    char *name;
+
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+    }
+
+    while ((name = KeyTable[list_index++].key)) {
+        if (strncmp(name, text, len) == 0) {
+            return strdup(name);
+        }
+    }
+
+    return NULL;
+}
 
 

@@ -1,5 +1,5 @@
 filterimage has a new syntax. It now can process a sequence of commands and the results are stored 
-in variables. This way you canb write scripts. 
+in variables. This way you can write scripts. 
 
 Usage:
 FilterImage [-i] [-f <input file>] [command] [command] [command] ...

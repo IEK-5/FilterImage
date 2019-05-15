@@ -16,4 +16,11 @@ void EL2Vj(image I, double T);
 void Vj2EL(image I, double T);
 image NormalizeImageRange(image I, double min, double max);
 image TestImage(int N, int M, double p);
+image DupImage(image A);
+void AddImages(image A, image B, double fa, double fb, image R);
+void MultImages(image A, image B, double fa, double fb, image R);
+void DivImages(image A, image B, double fa, double fb, image R);	
+void ScaMultImage(image A, double fa);
+void ScaDivImage(image A, double fa);
+void ScaAddImage(image A, double fa);
 #endif
