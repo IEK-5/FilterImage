@@ -809,6 +809,88 @@ void ELtoVj(char *in)
 	free(name);
 }
 
+// PARSEFLAG addimages AddIm "addimage I1=<image-variable> f1=<float> I2=<image-variable> f2=<float> I3=<image-variable>"
+void AddIm(char *in)
+{
+	image I1, I2, I3;
+	double f1, f2;
+	char *name;
+	name=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I1", name);
+	if (!LookupImage(name, &I1))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
+	}
+	GetArg(in, "I2", name);
+	if (!LookupImage(name, &I2))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
+	}
+	GetArg(in, "f1", name);
+	f1=atof(name);
+	GetArg(in, "f2", name);
+	f2=atof(name);
+	GetArg(in, "I3", name);
+	if (!ERRORSTATE)
+	{
+		I3=DupImage(I1);
+		AddImages(I1, I2, f1, f2, I3);
+		
+		if (!ERRORSTATE)
+		{
+			printf("Defining image \"%s\"\n", name);
+			AddImage(name, I3);
+		}
+		else
+			FreeImage(&I3);
+	}
+	free(name);
+}
+// PARSEFLAG absimage AbsIm "absimage I=<image-variable>
+void AbsIm(char *in)
+{
+	image I;
+	char *name;
+	name=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	if (!LookupImage(name, &I))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
+	}
+	if (!ERRORSTATE)
+		AbsImage(I);
+	free(name);
+}
+
+// PARSEFLAG clipimage ClipIm "clipimage I=<image-variable> th=<float> p=<int>
+void ClipIm(char *in)
+{
+	image I;
+	int p;
+	double th;
+	char *name;
+	name=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	if (!LookupImage(name, &I))
+	{
+		AddErr(ERRNOOIMAGE);
+		free(name);
+		return;
+	}
+	GetArg(in, "th", name);
+	th=atof(name);
+	GetArg(in, "p", name);
+	p=atoi(name);
+	if (!ERRORSTATE)
+		ImageClip(I,th, p);
+	free(name);
+}
 void SplitWords(char *in, char *ident)
 {
 	char *word;

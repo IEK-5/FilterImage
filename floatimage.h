@@ -23,4 +23,6 @@ void DivImages(image A, image B, double fa, double fb, image R);
 void ScaMultImage(image A, double fa);
 void ScaDivImage(image A, double fa);
 void ScaAddImage(image A, double fa);
+void AbsImage(image A);
+void ImageClip(image A, double th, int p);
 #endif

@@ -111,46 +111,47 @@ image DupImage(image A)
 	R.M=A.M;
 	R.I=malloc(R.N*R.M*sizeof(double));
 	for (i=0;i<R.N*R.M;i++)
-		C.I[i]=A.I[i];	
+		R.I[i]=A.I[i];
+	return R;	
 }
 
 void AddImages(image A, image B, double fa, double fb, image R)
 {
 	int i;
-	if ((A.N!=B.N)||(A.M!=B.M)||(A.N!=C.N)||(A.M!=C.M))
+	if ((A.N!=B.N)||(A.M!=B.M)||(A.N!=R.N)||(A.M!=R.M))
 	{
 		// ERRORFLAG ERRADDIM  "cannot add images, dimensions do not match"
 		AddErr(ERRADDIM);
 		return;
 	}
-	for (i=0;i<C.N*C.M;i++)
-		C.I[i]=fa*A.I[i]+fb*B.I[i];
+	for (i=0;i<R.N*R.M;i++)
+		R.I[i]=fa*A.I[i]+fb*B.I[i];
 }
 
 void MultImages(image A, image B, double fa, double fb, image R)
 {
 	int i;
-	if ((A.N!=B.N)||(A.M!=B.M)||(A.N!=C.N)||(A.M!=C.M))
+	if ((A.N!=B.N)||(A.M!=B.M)||(A.N!=R.N)||(A.M!=R.M))
 	{
 		// ERRORFLAG ERRMULTIM  "cannot multiply images, dimensions do not match"
 		AddErr(ERRMULTIM);
 		return;
 	}
-	for (i=0;i<C.N*C.M;i++)
-		C.I[i]=fa*A.I[i]*fb*B.I[i];
+	for (i=0;i<R.N*R.M;i++)
+		R.I[i]=fa*A.I[i]*fb*B.I[i];
 }
 
 void DivImages(image A, image B, double fa, double fb, image R)
 {
 	int i;
-	if ((A.N!=B.N)||(A.M!=B.M)||(A.N!=C.N)||(A.M!=C.M))
+	if ((A.N!=B.N)||(A.M!=B.M)||(A.N!=R.N)||(A.M!=R.M))
 	{
 		// ERRORFLAG ERRDIVIM  "cannot divide images, dimensions do not match"
 		AddErr(ERRDIVIM);
 		return;
 	}
-	for (i=0;i<C.N*C.M;i++)
-		C.I[i]=fa*A.I[i]/(fb*B.I[i]);
+	for (i=0;i<R.N*R.M;i++)
+		R.I[i]=fa*A.I[i]/(fb*B.I[i]);
 }
 	
 void ScaMultImage(image A, double fa)
@@ -171,4 +172,27 @@ void ScaAddImage(image A, double fa)
 	int i;
 	for (i=0;i<A.N*A.M;i++)
 		A.I[i]+=fa;
+}
+void AbsImage(image A)
+{	
+	int i;
+	for (i=0;i<A.N*A.M;i++)
+		A.I[i]=fabs(A.I[i]);
+}
+void ImageClip(image A, double th, int p)
+{	
+	int i;
+	for (i=0;i<A.N*A.M;i++)
+	{
+		if (p)
+		{
+			if (A.I[i]>th)
+				A.I[i]=th;
+		}
+		else
+		{
+			if (A.I[i]<th)
+				A.I[i]=th;
+		}
+	}
 }
