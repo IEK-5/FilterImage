@@ -1031,3 +1031,65 @@ image ApplyFilter(image I, int stepy, int stepx, filterset F)
 		return null_image;
 	return R;
 }
+
+
+/************************** Compact Interface, without seperate filters *************************************/
+image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m,  int *dmx, int *dmy, double *f, int Nd, char method)
+/* the plain convolution filter
+ * input:
+ * I: 		image in column major format 
+ * N,M: 	size of the image
+ * nsurr:	number of elements to use in north, south, west, and east direction
+ * deriv_m:	which derivative to compute
+ * d:		dpecification of direction, x, y, or n (x+y)
+ * Returns a filtered image.
+ */
+{	
+	filterset F;
+	image R;
+	F=DerivOperatorSet2D(ny, ny, nx, nx, m, dmx, dmy, f, Nd, method);
+	if (ERRORSTATE)
+		return null_image;
+	R=PL_ApplyFilter(I, stepy, stepx, F);
+	FreeFilterSet(&F);
+	return R;
+}
+
+image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int *dmx, int *dmy, double *f, int Nd, char method)
+/* same as above only now using an fft. 
+ * downside: edge effects as the FFT treats the image as periodic
+ * upside: This routine's computation time is independant on the filter size and thus this routine is faster for larger filters
+ *         (for small filters, ~3x3, computation times are very similar)
+ */
+{	
+    image R;
+	filter F;
+	F=PartDeriv2DSum(ny, ny, nx, nx, m, dmx, dmy, f, Nd, method);
+	if (ERRORSTATE)
+		return null_image;
+	R=FFT_ApplyFilter(I, stepy, stepx, F);
+	FreeFilter(&F);
+    return R;
+}
+image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m,  int *dmx, int *dmy, double *f, int Nd, char method)
+/* use FFT for the center part of the image and the plain method for the edge
+ * input:
+ * I: 		image in column major format 
+ * N,M: 	size of the image
+ * nsurr:	number of elements to use in north, south, west, and east direction
+ * deriv_m:	which derivative to compute
+ * d:		dpecification of direction, x, y, or n (x+y)
+ * Returns a filtered image.
+ */
+{	
+	filterset F;
+	image R;
+	F=DerivOperatorSet2D(ny, ny, nx, nx, m, dmx, dmy, f, Nd, method);
+	if (ERRORSTATE)
+		return null_image;
+	R=ApplyFilter(I, stepy, stepx, F);
+	if (ERRORSTATE)
+		return null_image;
+	FreeFilterSet(&F);
+	return R;
+}

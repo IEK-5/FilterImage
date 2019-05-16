@@ -36,4 +36,8 @@ image FFT_ApplyFilter(image I, int stepy, int stepx,  filter F);
 // mix of plain and FFT routines, try to be fast without edge effects
 image ApplyFilter(image I, int stepy, int stepx,  filterset F);
 
+/************************** Compact Interface, without seperate filters *************************************/
+image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int *dmx, int *dmy, double *f, int Nd, char method);
+image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int *dmx, int *dmy, double *f, int Nd, char method);
+image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, int *dmx, int *dmy, double *f, int Nd, char method);
 #endif
