@@ -379,13 +379,14 @@ double *LLS(int nn, int ns, int nw, int ne, int m, char method)
 	
 	N=(nn+ns+1)*(nw+ne+1);	
 	M=((nn+ns>0)+(ne+nw>0))*m+1;
-	
-	if (M>N)
+		
+	if (((method=='s')||(method=='q'))&&(M>N))
 	{
-		// ERRORFLAG ERRKERNELTOSMALL  "kernel too small for polynomal order"
+		// ERRORFLAG ERRKERNELTOSMALL  "kernel too small for polynomal order, choose a larger kernel or use methods i or p"
 		AddErr(ERRKERNELTOSMALL);
 		return NULL;
 	}
+	
 	
 	A=malloc((N*M)*sizeof(double));
 	i=0;
@@ -473,9 +474,9 @@ double *LLSmix(int nn, int ns, int nw, int ne, int m, char method)
 	else
 		M=m+1;
 	
-	if (M>N)
+	if (((method=='s')||(method=='q'))&&(M>N))
 	{
-		// ERRORFLAG ERRKERNELTOSMALL  "kernel too small for polynomal order"
+		// ERRORFLAG ERRKERNELTOSMALL  "kernel too small for polynomal order, choose a larger kernel or use methods i or p"
 		AddErr(ERRKERNELTOSMALL);
 		return NULL;
 	}
@@ -493,7 +494,7 @@ double *LLSmix(int nn, int ns, int nw, int ne, int m, char method)
 				if ((nn+ns>0)&&(ne+nw>0))	
 				{	
 					for (j=0;j<=p;j++)
-						A[INDEX(i,k++,N)]=pow((double)I,(double)(p-j))*pow((double)J,(double)j);
+						A[INDEX(i,k++,N)]=pow((double)J,(double)(p-j))*pow((double)I,(double)j);
 				}
 				else
 				{
