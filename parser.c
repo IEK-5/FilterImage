@@ -850,7 +850,7 @@ void AddIm(char *in)
 	}
 	free(name);
 }
-// PARSEFLAG absimage AbsIm "absimage I=<image-variable>
+// PARSEFLAG absimage AbsIm "absimage I=<image-variable>"
 void AbsIm(char *in)
 {
 	image I;
@@ -868,7 +868,7 @@ void AbsIm(char *in)
 	free(name);
 }
 
-// PARSEFLAG clipimage ClipIm "clipimage I=<image-variable> th=<float> p=<int>
+// PARSEFLAG clipimage ClipIm "clipimage I=<image-variable> th=<float> p=<int>"
 void ClipIm(char *in)
 {
 	image I;
