@@ -1,3 +1,6 @@
+#ifndef ERROR_H
+#define ERROR_H
+
 /* TODO:
  * We do not want the texprintf library to errorexit all the time
  * It should rather give up parsing and set some error flags
@@ -6,7 +9,10 @@
 
 extern char *EMessages[];
 extern int ERRORSTATE;	/* signals error occurred, if 0 everything is OK */
+extern int EXITSTATE; /* exit code of the program */
 void AddErr(int ERRFLAG); /* call to set an error flag as defined in errorflags.h */
 int QueryErr(int ERRFLAG);
 void E_Messages();
 void ResetErrors();
+
+#endif

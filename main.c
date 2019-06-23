@@ -71,5 +71,6 @@ int main(int argc, char **argv)
 			break;
 	}
 	ClearVars();
-}
 
+	exit(EXITSTATE);
+}
