@@ -627,7 +627,7 @@ filter PartDeriv2DSum(int nn, int ns, int nw, int ne, int m, int *dmx, int *dmy,
 {
 	double *a; 
 	int i;
-	filter r;
+	filter r, d;
 	a=LLSmix(nn, ns, nw, ne, m, method);
 	if (ERRORSTATE)
 		return null_filter;
@@ -645,7 +645,9 @@ filter PartDeriv2DSum(int nn, int ns, int nw, int ne, int m, int *dmx, int *dmy,
 			AddErr(ERRPOID);
 			return null_filter;
 		}
-		AddFilters(r, PartDeriv2D(a, nn, ns, nw, ne, m, dmx[i], dmy[i], method),1.0, f[i], r);
+		d=PartDeriv2D(a, nn, ns, nw, ne, m, dmx[i], dmy[i], method);
+		AddFilters(r, d,1.0, f[i], r);
+		FreeFilter(&d);
 	}
 	free(a);
 	return r;
