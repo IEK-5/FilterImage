@@ -738,7 +738,8 @@ void FreeFilter(filter *F)
 	F->ns=0;
 	F->ne=0;
 	F->nw=0;
-	free(F->F);
+	if(F->F)
+		free(F->F);
 	F->F=NULL;
 }
 
@@ -802,7 +803,8 @@ void FreeFilterSet(filterset *F)
 	F->ns=0;
 	F->ne=0;
 	F->nw=0;
-	free(F->set);
+	if(F->set)
+		free(F->set);
 	F->set=NULL;
 }
 
@@ -1048,8 +1050,10 @@ image PL_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m,  
 	filterset F;
 	image R;
 	F=DerivOperatorSet2D(ny, ny, nx, nx, m, dmx, dmy, f, Nd, method);
-	if (ERRORSTATE)
+	if (ERRORSTATE){
+		FreeFilterSet(&F);
 		return null_image;
+	}
 	R=PL_ApplyFilter(I, stepy, stepx, F);
 	FreeFilterSet(&F);
 	return R;
@@ -1065,8 +1069,10 @@ image FFT_PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m, 
     image R;
 	filter F;
 	F=PartDeriv2DSum(ny, ny, nx, nx, m, dmx, dmy, f, Nd, method);
-	if (ERRORSTATE)
+	if (ERRORSTATE){
+		FreeFilter(&F);
 		return null_image;
+	}
 	R=FFT_ApplyFilter(I, stepy, stepx, F);
 	FreeFilter(&F);
     return R;
@@ -1086,10 +1092,16 @@ image PolynomalFilter(image I, int ny, int nx, int stepy, int stepx, int m,  int
 	image R;
 	F=DerivOperatorSet2D(ny, ny, nx, nx, m, dmx, dmy, f, Nd, method);
 	if (ERRORSTATE)
+	{
+		FreeFilterSet(&F);
 		return null_image;
+	}
 	R=ApplyFilter(I, stepy, stepx, F);
 	if (ERRORSTATE)
+	{
+		FreeFilterSet(&F);
 		return null_image;
+	}
 	FreeFilterSet(&F);
 	return R;
 }
