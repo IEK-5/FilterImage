@@ -949,7 +949,9 @@ image FFT_ApplyFilter(image I, int stepy, int stepx, filter F)
 			{
 				AddErr(ERRFILTERTOOBIG);
 				return null_image;
-			}					
+			}
+			ii=I.N-ii-1;	
+			jj=I.M-jj-1;					
 			PSF[INDEX(ii,jj,I.N)]=F.F[INDEX(F.nn+i/stepy, F.nw+j/stepx,F.nn+F.ns+1)];
 		}
 	//PrintMat(PSF, I.N, I.M);
