@@ -196,3 +196,4 @@ void ImageClip(image A, double th, int p)
 		}
 	}
 }
+

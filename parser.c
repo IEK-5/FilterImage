@@ -360,6 +360,35 @@ void FilterSave(char *in)
 	free(file);
 }
 
+// PARSEFLAG testimage MakeTestImage "I=<image-variable> N=<rows> M=<columns> m=<order>"
+void MakeTestImage(char *in)
+{	
+	image I;
+	char *name, *word;
+	int N=10, M=10;
+	double p=2;
+	word=malloc((strlen(in)+1)*sizeof(char));
+	name=malloc((strlen(in)+1)*sizeof(char));
+	
+	GetArg(in, "I", name);
+	if (GetOption(in, "N", word))
+		N=atoi(word);
+	if (GetOption(in, "M", word))
+		M=atoi(word);
+	if (GetOption(in, "m", word))
+		p=atof(word);
+	I=TestImage(N, M, p);
+	
+	if (!ERRORSTATE)
+	{
+		printf("Defining image \"%s\"\n", name);
+		AddImage(name, I);
+	}
+	else
+		free(name);
+	
+	free(word);
+}
 void dmStringParser(char *dmstr, int **dmx, int **dmy, double **f, int *N)
 {
 	char *p, *q, *r;
@@ -449,7 +478,7 @@ void dmStringParser(char *dmstr, int **dmx, int **dmy, double **f, int *N)
 		(*N)++;
 	}
 }
-// PARSEFLAG makefilter MakeFilter "F=<filter-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<int> fx=<float> fy=<float> method=<char>"
+// PARSEFLAG makefilter MakeFilter "F=<filter-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<float>x<int>y<int>+... method=<[\'i\',\'q\',\'s\',\'p\']>"
 void MakeFilter(char *in)
 {
 	filter F;	
@@ -519,7 +548,7 @@ void MakeFilter(char *in)
 }
 
 
-// PARSEFLAG makefilterset MakeFilterSet "F=<filter-set-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<string> method=<char>"
+// PARSEFLAG makefilterset MakeFilterSet "F=<filter-set-variable> nn=<int> ns=<int> ne=<int> nw=<int> m=<int> dm=<float>x<int>y<int>+... method=<[\'i\',\'q\',\'s\',\'p\']>"
 void MakeFilterSet(char *in)
 {
 	filterset F;	
