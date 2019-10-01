@@ -212,23 +212,30 @@ double *GetLine(FILE *f, int *M)
 	char ch='a';
 	
 	Line=malloc(Na*sizeof(double));
+	if(fscanf(f,"%[#]", &ch)==1)
+	{
+		(*M)=i;
+		while ((feof(f)==0)&&(fscanf(f,"%c", &ch)))
+		{
+			if (ch=='\n')
+				break;
+		}
+		return NULL;
+	}
+	
 	while ((feof(f)==0)&&(ch!='\n'))
 	{
 		/* get and allocate a word */
 		if (fscanf(f,"%ms", &word)==1)
 		{
-			if (*word!='#')
+			/* put it in the data array */
+			Line[i]=atof(word);
+			i++;
+			if (i==Na)
 			{
-				/* put it in the data array */
-				Line[i]=atof(word);
-				i++;
-				if (i==Na)
-				{
-					Na+=10;
-					Line=realloc(Line,Na*sizeof(double));
-				}	
+				Na+=10;
+				Line=realloc(Line,Na*sizeof(double));
 			}
-			/* free the word for the next run */
 			free(word);
 		}
 		// clear whitespace but no endlines
@@ -236,7 +243,6 @@ double *GetLine(FILE *f, int *M)
 		/* check for an endline */
 		fscanf(f,"%[\n]",&ch);
 	}
-	Line=realloc(Line,i*sizeof(double));
 	(*M)=i;
 	return Line;
 }
@@ -260,9 +266,7 @@ image FloatimageTXTRead(char *fn)
 	do
 	{
 		Line=GetLine(f, &Ml);
-		if (!Ml)
-			free(Line);
-	} while ((feof(f)==0)&&(Ml==0));
+	} while ((feof(f)==0)&&(!Line));
 	
 	if (Ml==0)
 	{
@@ -274,26 +278,28 @@ image FloatimageTXTRead(char *fn)
 	D=malloc(Na*sizeof(double *));
 	D[N]=Line;
 	N++;
+	printf("M=%d\n", M);
 	while ((feof(f)==0))
 	{		
 		Line=GetLine(f, &Ml);
-		if (!Ml)
-			free(Line);
-		else if (Ml!=M)	
+		if (Line)
 		{
-			// ERRORFLAG ERRTXTINDIFFLL  "different line lengths in image file"
-			AddErr(ERRTXTINDIFFLL);
-			return I;
-		}
-		else
-		{
-			D[N]=Line;
-			N++;
-			if (N==Na)
+			if (Ml!=M)
 			{
-				Na+=10;
-				D=realloc(D,Na*sizeof(double *));
-			}			
+				// ERRORFLAG ERRTXTINDIFFLL  "different line lengths in image file"
+				AddErr(ERRTXTINDIFFLL);
+				return I;
+			}
+			else
+			{
+				D[N]=Line;
+				N++;
+				if (N==Na)
+				{
+					Na+=10;
+					D=realloc(D,Na*sizeof(double *));
+				}			
+			}
 		}
 	}
 	printf("loaded %dx%d image\n", N, M);
