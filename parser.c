@@ -261,6 +261,27 @@ void TXTSaveFile(char *in)
 	}
 	free(file);
 }
+// PARSEFLAG txtread TXTReadFile "I=<image-variable> file=<filename>"
+void TXTReadFile(char *in)
+{
+	image I;
+	char *name; 
+	char *file; 
+	
+	name=malloc((strlen(in)+1)*sizeof(char));
+	file=malloc((strlen(in)+1)*sizeof(char));
+	GetArg(in, "I", name);
+	if (GetArg(in, "file", file))
+		I=FloatimageTXTRead(file);
+	if (!ERRORSTATE)
+	{
+		printf("Defining image \"%s\"\n", name);
+		AddImage(name, I);
+	}	
+	else
+		free(name);
+	free(file);
+}
 // PARSEFLAG fsetread FilterSetRead "F=<filter-set-variable> file=<filename>"
 // PARSEFLAG fsetload FilterSetRead "F=<filter-set-variable> file=<filename>"
 void FilterSetRead(char *in)

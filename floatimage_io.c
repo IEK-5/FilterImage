@@ -202,3 +202,113 @@ void FloatimageTXTWrite(char *fn, image I)
 	}
 	fclose(f);
 }
+
+double *GetLine(FILE *f, int *M)
+{
+	double *Line;
+	char *word;
+	int Na=10;
+	int i=0;
+	char ch='a';
+	
+	Line=malloc(Na*sizeof(double));
+	while ((feof(f)==0)&&(ch!='\n'))
+	{
+		/* get and allocate a word */
+		if (fscanf(f,"%ms", &word)==1)
+		{
+			if (*word!='#')
+			{
+				/* put it in the data array */
+				Line[i]=atof(word);
+				i++;
+				if (i==Na)
+				{
+					Na+=10;
+					Line=realloc(Line,Na*sizeof(double));
+				}	
+			}
+			/* free the word for the next run */
+			free(word);
+		}
+		// clear whitespace but no endlines
+		while ((feof(f)==0)&&(fscanf(f,"%[ \t]", &ch)==1));
+		/* check for an endline */
+		fscanf(f,"%[\n]",&ch);
+	}
+	Line=realloc(Line,i*sizeof(double));
+	(*M)=i;
+	return Line;
+}
+
+
+image FloatimageTXTRead(char *fn)
+{
+	FILE *f;
+	image I = {NULL, 0, 0};
+	double *Line;
+	double **D;
+	int M, Ml=0;
+	int N=0, Na=10, i, j;
+	
+	if ((f=fopen(fn,"r"))==NULL)
+	{
+		// ERRORFLAG ERRIFILER  "cannot open txt file for reading"
+		AddErr(ERRIFILER);
+		return I;
+	}
+	do
+	{
+		Line=GetLine(f, &Ml);
+		if (!Ml)
+			free(Line);
+	} while ((feof(f)==0)&&(Ml==0));
+	
+	if (Ml==0)
+	{
+		// ERRORFLAG ERRTXTINNODATA  "no usable data in file"
+		AddErr(ERRTXTINNODATA);
+		return I;
+	}
+	M=Ml;
+	D=malloc(Na*sizeof(double *));
+	D[N]=Line;
+	N++;
+	while ((feof(f)==0))
+	{		
+		Line=GetLine(f, &Ml);
+		if (!Ml)
+			free(Line);
+		else if (Ml!=M)	
+		{
+			// ERRORFLAG ERRTXTINDIFFLL  "different line lengths in image file"
+			AddErr(ERRTXTINDIFFLL);
+			return I;
+		}
+		else
+		{
+			D[N]=Line;
+			N++;
+			if (N==Na)
+			{
+				Na+=10;
+				D=realloc(D,Na*sizeof(double *));
+			}			
+		}
+	}
+	printf("loaded %dx%d image\n", N, M);
+	I.M=M;
+	I.N=N;	
+    I.I=malloc(I.N*I.M*sizeof(double));	
+	for (i=0;i<I.N;i++)
+	{
+		for (j=0;j<I.M;j++)
+			I.I[INDEX(i,j,I.N)]=D[i][j];
+		free(D[i]);
+	}
+	
+	fclose(f);
+	free(D);
+	return I;
+}
+
