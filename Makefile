@@ -1,4 +1,4 @@
-CFLAGS = -Wall -pedantic -Og -g -fPIC `MagickWand-config --cflags`
+CFLAGS = -Wall -std=gnu99 -pedantic -Og -g -fPIC `MagickWand-config --cflags`
 LFLAGS =  -lm -lreadline -llapack -lopenblas -lfftw3 `MagickWand-config --ldflags --libs`
 CC = gcc
 SRC=floatimage.c floatimage_io.c filter.c error.c main.c parser.c variables.c readlineshell.c
