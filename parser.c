@@ -533,7 +533,6 @@ void MakeFilter(char *in)
 	
 	if (GetOption(in, "dm", word))
 		dmStringParser(word, &dmx, &dmy, &f, &N);
-	
 	if (ERRORSTATE)
 	{
 		if (dmx)

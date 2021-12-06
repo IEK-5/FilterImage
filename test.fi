@@ -1,0 +1,29 @@
+# load an image and store the image in variable "Iin"
+imread I=Iin file='test.png'
+
+# check the image
+show I=Iout
+
+# create a filter set and store it in variable F. 
+# The order of the Savitzky-Golay filter, m, is two. Filters may be 
+# used to create a linear combination of partial derivatives using the 
+# following format: "dm=<weight>x<order>y<order>". Here 
+# <weight> is a floating point weight, and the x and y orders are 
+# the order of the partial derivatives to x and y, respectively. In 
+# this is case we crate a Laplacian. Finally we specify the method 
+# used to compute the filter. Options are "i" (inverse), "s" (svd), 
+# "p" (pseudo inverse), and "q" (QR)
+makefilterset F=F nn=17 ns=17 ne=17 nw=17 m=2 dm=1x2y0+1x0y2 method=p
+
+# you can save the filter to file for later usage (stored in a binary 
+# format)
+fsetsave F=F file=F.filterset
+
+# Apply the filter-set F to image Iin and store the results in Iout
+applyfilterset Iin=Iin Iout=Iout F=F stepx=1 stepy=1
+
+# Inspect the results
+show I=Iout
+
+# save the results
+imsave I=Iout file=filteredtest.png
