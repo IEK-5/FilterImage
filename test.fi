@@ -2,7 +2,7 @@
 imread I=Iin file='test.png'
 
 # check the image
-show I=Iout
+show I=Iin
 
 # create a filter set and store it in variable F. 
 # The order of the Savitzky-Golay filter, m, is two. Filters may be 
@@ -13,7 +13,7 @@ show I=Iout
 # this is case we crate a Laplacian. Finally we specify the method 
 # used to compute the filter. Options are "i" (inverse), "s" (svd), 
 # "p" (pseudo inverse), and "q" (QR)
-makefilterset F=F nn=17 ns=17 ne=17 nw=17 m=2 dm=1x2y0+1x0y2 method=p
+makefilterset F=F nn=4 ns=10 ne=10 nw=10 m=2 dm=1x2y0+1x0y2 method=p
 
 # you can save the filter to file for later usage (stored in a binary 
 # format)
