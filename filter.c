@@ -1042,9 +1042,6 @@ image ApplyFilter(image I, int stepy, int stepx, filterset F)
 /* apply a filter set using a plain convolution */
 {
 	image R;
-	R.I=malloc(I.N*I.M*sizeof(double));
-	R.N=I.N;
-	R.M=I.M;	
 	/* first do an FFT convolution */
 	R=FFT_ApplyFilter(I, stepy, stepx,F.set[F.nn*(F.nw+F.ne+1)+F.nw]);
 	if (ERRORSTATE)
